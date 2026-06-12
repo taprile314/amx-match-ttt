@@ -21,6 +21,7 @@ const HEADER = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
 // RCON (GoldSrc, UDP)
 // ---------------------------------------------------------------------------
 function rcon(command) {
+  console.log('[rcon ' + new Date().toISOString() + '] -> ' + command); // log de auditoria de comandos
   return new Promise((resolve, reject) => {
     const sock = dgram.createSocket('udp4');
     let challenge = null;
@@ -128,6 +129,7 @@ function json(res, code, obj) {
 const STATIC = {
   '/': ['index.html', 'text/html; charset=utf-8'],
   '/index.html': ['index.html', 'text/html; charset=utf-8'],
+  '/logo_ttt.png': ['logo_ttt.png', 'image/png'],
 };
 
 const server = http.createServer(async (req, res) => {
