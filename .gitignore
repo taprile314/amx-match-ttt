@@ -1,0 +1,25 @@
+# Artefactos de compilación temporales
+*.asm
+*.lst
+compiled/
+*.amxx.bak*
+
+# Backups
+*.bak
+*.bak-*
+backups/
+
+# Basura del SO / editores
+Thumbs.db
+desktop.ini
+.DS_Store
+*~
+*.swp
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Credenciales reales (solo se versiona el .example)
+configs/users.ini

@@ -1,0 +1,12 @@
+; Users configuration file (PLANTILLA)
+; File location real: $moddir/addons/amxmodx/configs/users.ini
+;
+; Copia este archivo a users.ini y completa la password real del admin.
+; NO commitees el users.ini real (esta en .gitignore).
+;
+; Access flags: a=inmunidad (admin del match lo necesita), ... (ver doc de AMX Mod X)
+;
+; Format: <name|ip|steamid> <password> <access flags> <account flags>
+
+"loopback" "" "abcdefghijklmnopqrstuv" "de"
+"TTT_Admin" "CAMBIAR_PASSWORD" "abcdefghijklmnopqrstu" "a"

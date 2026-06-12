@@ -1,0 +1,17 @@
+This project is a derivative work of "amx_match_deluxe" (originally by Shromilder,
+ported to AMX Mod X by Infra) and AMX Mod X, and is distributed under the terms of the
+GNU General Public License (GPL), the same license as the original work.
+
+You should preserve the original authorship notice in scripting/amx_match_deluxe.sma.
+
+Modifications in this repository ("amx-match-ttt") were made for the TTT 2026
+Counter-Strike 1.6 LAN tournament. They are released under the same GPL terms.
+
+The full text of the GNU General Public License is available at:
+    https://www.gnu.org/licenses/gpl-3.0.txt
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+Original work:
+    amx_match_deluxe 8.11 — Shromilder (original), Infra (AMX Mod X port)
