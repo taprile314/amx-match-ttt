@@ -23,3 +23,7 @@ desktop.ini
 
 # Credenciales reales (solo se versiona el .example)
 configs/users.ini
+rcon-panel/config.json
+
+# Node (por si en el futuro el panel usa dependencias)
+node_modules/

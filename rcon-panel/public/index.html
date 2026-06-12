@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TTT — Panel de Control</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0B0B0C;
+    --panel: #141417;
+    --border: #1E1E22;
+    --text: #E9E9EC;
+    --muted: #8A8A93;
+    --accent: #FF5C38;
+    --ok: #3FB950;
+    --bad: #F85149;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, Segoe UI, Tahoma, Verdana, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  h1, h2 { letter-spacing: .5px; }
+  h1 { font-size: 20px; margin: 0; }
+  h2 { font-size: 13px; text-transform: uppercase; color: var(--accent); margin: 0 0 12px; letter-spacing: 1px; }
+  a { color: var(--accent); }
+  .hidden { display: none !important; }
+
+  header.bar {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 14px 20px; border-bottom: 1px solid var(--border); background: #0E0E10;
+    position: sticky; top: 0; z-index: 5;
+  }
+  .logo { background: var(--accent); color: #0B0B0C; font-weight: 800; padding: 4px 9px; border-radius: 6px; letter-spacing: 2px; }
+  .bar .spacer { flex: 1; }
+  .conn { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+
+  main { max-width: 1100px; margin: 0 auto; padding: 20px; display: grid; gap: 18px; grid-template-columns: 1fr 1fr; }
+  section.card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  section.wide { grid-column: 1 / -1; }
+  @media (max-width: 820px) { main { grid-template-columns: 1fr; } }
+
+  label { display: block; font-size: 12px; color: var(--muted); margin: 0 0 4px; }
+  input, select {
+    width: 100%; background: #0E0E10; color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font: inherit;
+  }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > * { flex: 1; min-width: 0; }
+  .field { margin-bottom: 10px; }
+
+  button {
+    background: #202026; color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0B0B0C; border-color: var(--accent); font-weight: 700; }
+  button.danger { border-color: #5a2320; color: #ff9b91; }
+  button.danger:hover { background: #2a1513; border-color: var(--bad); }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px; }
+
+  #console-out {
+    background: #08080a; border: 1px solid var(--border); border-radius: 6px;
+    padding: 10px; height: 240px; overflow: auto; font-family: Consolas, monospace;
+    font-size: 12.5px; white-space: pre-wrap; word-break: break-word;
+  }
+  #console-out .cmd { color: var(--accent); }
+  #console-out .err { color: var(--bad); }
+
+  .login-wrap { min-height: 80vh; display: grid; place-items: center; padding: 20px; }
+  .login-card { width: 320px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .login-card .logo { display: inline-block; margin-bottom: 14px; font-size: 22px; }
+
+  dialog { background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; max-width: 380px; }
+  dialog::backdrop { background: rgba(0,0,0,.6); }
+  .toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: #202026; border: 1px solid var(--border); padding: 10px 16px; border-radius: 8px;
+    font-size: 13px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 10;
+  }
+  .toast.show { opacity: 1; }
+  .toast.err { border-color: var(--bad); }
+  small.hint { color: var(--muted); font-size: 11.5px; }
+</style>
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<div id="login-view" class="login-wrap hidden">
+  <main class="login-card" style="display:block">
+    <span class="logo">TTT</span>
+    <h1>Panel de Control</h1>
+    <p class="hint"><small class="hint">Counter-Strike 1.6 · Torneo</small></p>
+    <form id="login-form">
+      <div class="field">
+        <label for="pw">Contraseña del panel</label>
+        <input id="pw" name="password" type="password" autocomplete="current-password" required autofocus>
+      </div>
+      <button class="primary" type="submit" style="width:100%">Entrar</button>
+      <p id="login-error" class="hidden" style="color:var(--bad);font-size:13px;margin:10px 0 0" role="alert"></p>
+    </form>
+  </main>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app-view" class="hidden">
+  <header class="bar">
+    <span class="logo">TTT</span>
+    <h1>Panel de Control</h1>
+    <div class="spacer"></div>
+    <span class="conn"><span id="conn-dot" class="dot" aria-hidden="true"></span><span id="conn-text">conectando…</span></span>
+    <button type="button" id="logout-btn">Salir</button>
+  </header>
+
+  <main>
+    <!-- ESTADO -->
+    <section class="card wide" aria-labelledby="h-status">
+      <div class="row" style="align-items:center;margin-bottom:12px">
+        <h2 id="h-status" style="margin:0;flex:1">Estado en vivo</h2>
+        <label style="display:flex;align-items:center;gap:6px;margin:0;flex:0 0 auto">
+          <input type="checkbox" id="auto-refresh" style="width:auto" checked> auto
+        </label>
+        <button type="button" id="refresh-btn" style="flex:0 0 auto">↻ Actualizar</button>
+      </div>
+      <p id="status-summary" class="hint" aria-live="polite"><small class="hint">—</small></p>
+      <div id="players-region" aria-live="polite">
+        <table id="players-table">
+          <thead><tr><th>#</th><th>Jugador</th><th class="num">Frags</th><th class="num">Ping</th><th></th></tr></thead>
+          <tbody id="players-body"></tbody>
+        </table>
+        <p id="players-empty" class="empty hidden">No hay jugadores conectados.</p>
+      </div>
+      <p><small class="hint">Nota: el marcador del match en vivo no se expone por rcon (lo lleva el plugin). Acá ves mapa, jugadores, frags y ping.</small></p>
+    </section>
+
+    <!-- MATCH -->
+    <section class="card" aria-labelledby="h-match">
+      <h2 id="h-match">Iniciar match</h2>
+      <form id="match-form">
+        <div class="row">
+          <div class="field"><label for="ct">Tag CT (opcional)</label><input id="ct" placeholder="RED"></div>
+          <div class="field"><label for="tt">Tag T (opcional)</label><input id="tt" placeholder="BLU"></div>
+        </div>
+        <div class="row">
+          <div class="field" style="flex:0 0 90px"><label for="fmt-type">Formato</label>
+            <select id="fmt-type"><option value="mr">mr</option><option value="tl">tl</option></select>
+          </div>
+          <div class="field" style="flex:0 0 90px"><label for="fmt-num">Rounds/min</label><input id="fmt-num" type="number" min="1" max="30" value="15"></div>
+          <div class="field"><label for="cfg">Config</label><select id="cfg"></select></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="rec" style="width:auto"> Grabar demo (recdemo)</label>
+        <p><small class="hint">Sin tags usa <code>amx_match2</code>. Con tags, <code>amx_match</code>.</small></p>
+        <button class="primary" type="submit" style="width:100%">▶ Iniciar match</button>
+      </form>
+    </section>
+
+    <!-- CONTROL -->
+    <section class="card" aria-labelledby="h-ctrl">
+      <h2 id="h-ctrl">Control del match</h2>
+      <div class="btns" style="margin-bottom:14px">
+        <button type="button" data-rcon="amx_matchstart">▶ Forzar inicio (/start)</button>
+        <button type="button" class="danger" data-confirm="¿Frenar/cancelar el match?" data-rcon="amx_matchstop">⏹ Detener (/stop)</button>
+        <button type="button" class="danger" data-confirm="¿Reiniciar el match desde cero?" data-rcon="amx_matchrestart">↻ Reiniciar match</button>
+        <button type="button" data-rcon="amx_matchrelo3">↻ Reiniciar mitad</button>
+        <button type="button" data-rcon="amx_swapteams">⇄ Swap teams</button>
+        <button type="button" data-rcon="amx_randomizeteams">🎲 Equipos al azar</button>
+      </div>
+      <h2 id="h-map">Mapa</h2>
+      <div class="row" style="align-items:flex-end">
+        <div class="field" style="margin:0"><label for="map-sel">Cambiar a</label><select id="map-sel"></select></div>
+        <button type="button" id="map-change" style="flex:0 0 auto">Cambiar mapa</button>
+        <button type="button" id="map-restart" style="flex:0 0 auto">Reiniciar mapa</button>
+      </div>
+    </section>
+
+    <!-- COMUNICACION -->
+    <section class="card" aria-labelledby="h-say">
+      <h2 id="h-say">Mensaje a los jugadores</h2>
+      <form id="say-form" class="row" style="align-items:flex-end">
+        <div class="field" style="margin:0"><label for="say-text">Texto (aparece en el chat del juego)</label><input id="say-text" maxlength="120" placeholder="Próximo match en 5 minutos"></div>
+        <button class="primary" type="submit" style="flex:0 0 auto">Enviar</button>
+      </form>
+    </section>
+
+    <!-- CONSOLA -->
+    <section class="card" aria-labelledby="h-con">
+      <h2 id="h-con">Consola rcon</h2>
+      <search>
+        <form id="console-form" class="row" style="margin-bottom:10px">
+          <input id="console-in" placeholder="status, changelevel de_dust2, amx_say ..., users" autocomplete="off" spellcheck="false" style="font-family:Consolas,monospace">
+          <button class="primary" type="submit" style="flex:0 0 auto">Ejecutar</button>
+        </form>
+      </search>
+      <div id="console-out" role="log" aria-live="polite" aria-label="Salida de la consola"></div>
+    </section>
+  </main>
+</div>
+
+<!-- Dialogo de confirmacion reutilizable -->
+<dialog id="confirm-dialog">
+  <form method="dialog">
+    <p id="confirm-msg" style="margin-top:0"></p>
+    <div class="btns" style="justify-content:flex-end">
+      <button value="cancel">Cancelar</button>
+      <button value="ok" class="danger">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = (s) => document.querySelector(s);
+
+  // ---------- helpers de red ----------
+  async function api(path, opts) {
+    const res = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts));
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    return { ok: res.ok, status: res.status, data };
+  }
+  const rcon = (cmd) => api('/api/rcon', { method: 'POST', body: JSON.stringify({ cmd }) });
+
+  // ---------- toast ----------
+  let toastTimer;
+  function toast(msg, isErr) {
+    const t = $('#toast');
+    t.textContent = msg;
+    t.classList.toggle('err', !!isErr);
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  // ---------- confirm dialog (promesa) ----------
+  function confirmAction(message) {
+    return new Promise((resolve) => {
+      const dlg = $('#confirm-dialog');
+      $('#confirm-msg').textContent = message;
+      dlg.returnValue = '';
+      dlg.showModal();
+      dlg.addEventListener('close', () => resolve(dlg.returnValue === 'ok'), { once: true });
+    });
+  }
+
+  // ---------- consola ----------
+  function logLine(text, cls) {
+    const out = $('#console-out');
+    const span = document.createElement('div');
+    if (cls) span.className = cls;
+    span.textContent = text;
+    out.appendChild(span);
+    out.scrollTop = out.scrollHeight;
+  }
+  async function runCmd(cmd, { echo = true } = {}) {
+    if (echo) logLine('> ' + cmd, 'cmd');
+    const { ok, data } = await rcon(cmd);
+    if (!ok) { logLine('[error] ' + (data.error || 'fallo'), 'err'); toast(data.error || 'Error rcon', true); return null; }
+    if (data.output) logLine(data.output);
+    return data.output;
+  }
+
+  // ---------- estado / status ----------
+  let autoTimer = null;
+  function setConn(state, text) {
+    const dot = $('#conn-dot'); dot.className = 'dot' + (state ? ' ' + state : '');
+    $('#conn-text').textContent = text;
+  }
+  async function refreshStatus() {
+    const { ok, data } = await api('/api/status');
+    if (!ok) { setConn('bad', data.error ? 'sin conexión' : 'error'); return; }
+    setConn('ok', 'conectado');
+    $('#status-summary').innerHTML = '<small class="hint">Mapa: <b style="color:var(--text)">' +
+      (data.map || '?') + '</b> · Jugadores: <b style="color:var(--text)">' +
+      (data.playerCount != null ? data.playerCount + '/' + data.maxPlayers : '?') + '</b></small>';
+    const body = $('#players-body'); body.innerHTML = '';
+    if (!data.players || !data.players.length) {
+      $('#players-empty').classList.remove('hidden');
+    } else {
+      $('#players-empty').classList.add('hidden');
+      for (const p of data.players) {
+        const tr = document.createElement('tr');
+        const kickBtn = p.uniqueid === 'BOT' || true; // siempre permitimos kick
+        tr.innerHTML = '<td class="num">' + p.slot + '</td>' +
+          '<td></td>' +
+          '<td class="num">' + p.frags + '</td>' +
+          '<td class="num">' + p.ping + '</td>' +
+          '<td style="text-align:right"></td>';
+        tr.children[1].textContent = p.name;           // nombre como texto (evita inyeccion)
+        const btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'danger'; btn.textContent = 'Kick';
+        btn.addEventListener('click', async () => {
+          if (await confirmAction('¿Kickear a "' + p.name + '" (userid ' + p.userid + ')?')) {
+            await runCmd('kick #' + p.userid);
+            toast('Kick enviado'); refreshStatus();
+          }
+        });
+        tr.children[4].appendChild(btn);
+        body.appendChild(tr);
+      }
+    }
+  }
+  function startAuto() { stopAuto(); if ($('#auto-refresh').checked) autoTimer = setInterval(refreshStatus, 5000); }
+  function stopAuto() { if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
+
+  // ---------- carga de mapas/configs ----------
+  async function loadMeta() {
+    const { ok, data } = await api('/api/meta');
+    if (!ok) return;
+    const mapSel = $('#map-sel'), cfg = $('#cfg');
+    for (const m of (data.maps || [])) { const o = document.createElement('option'); o.value = o.textContent = m; mapSel.appendChild(o); }
+    for (const c of (data.configs || [])) { const o = document.createElement('option'); o.value = o.textContent = c; cfg.appendChild(o); }
+  }
+
+  // ---------- login / vistas ----------
+  function showApp() {
+    $('#login-view').classList.add('hidden');
+    $('#app-view').classList.remove('hidden');
+    loadMeta(); refreshStatus(); startAuto();
+  }
+  function showLogin() {
+    $('#app-view').classList.add('hidden');
+    $('#login-view').classList.remove('hidden');
+    stopAuto();
+    setTimeout(() => $('#pw').focus(), 50);
+  }
+
+  // ---------- wire up ----------
+  $('#login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const { ok, data } = await api('/api/login', { method: 'POST', body: JSON.stringify({ password: $('#pw').value }) });
+    const err = $('#login-error');
+    if (ok) { err.classList.add('hidden'); $('#pw').value = ''; showApp(); }
+    else { err.textContent = data.error || 'Error'; err.classList.remove('hidden'); }
+  });
+
+  $('#logout-btn').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); showLogin(); });
+
+  $('#refresh-btn').addEventListener('click', refreshStatus);
+  $('#auto-refresh').addEventListener('change', startAuto);
+
+  // botones con data-rcon (y opcional data-confirm)
+  document.querySelectorAll('[data-rcon]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const cmd = btn.getAttribute('data-rcon');
+      const msg = btn.getAttribute('data-confirm');
+      if (msg && !(await confirmAction(msg))) return;
+      await runCmd(cmd); toast('Comando enviado'); refreshStatus();
+    });
+  });
+
+  $('#match-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const ct = $('#ct').value.trim(), tt = $('#tt').value.trim();
+    const fmt = $('#fmt-type').value + $('#fmt-num').value;
+    const cfg = $('#cfg').value;
+    const rec = $('#rec').checked ? ' recdemo' : '';
+    const cmd = (ct && tt) ? `amx_match ${ct} ${tt} ${fmt} ${cfg}${rec}` : `amx_match2 ${fmt} ${cfg}${rec}`;
+    await runCmd(cmd); toast('Match iniciado: ' + fmt + ' ' + cfg); refreshStatus();
+  });
+
+  $('#map-change').addEventListener('click', async () => {
+    const m = $('#map-sel').value;
+    if (await confirmAction('¿Cambiar el mapa a "' + m + '"? Se reinicia el mapa para todos.')) {
+      await runCmd('changelevel ' + m); toast('Cambiando a ' + m);
+    }
+  });
+  $('#map-restart').addEventListener('click', async () => {
+    if (await confirmAction('¿Reiniciar el mapa actual?')) { await runCmd('restart'); toast('Reiniciando mapa'); }
+  });
+
+  $('#say-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const txt = $('#say-text').value.trim();
+    if (!txt) return;
+    await runCmd('say ' + txt); $('#say-text').value = ''; toast('Mensaje enviado');
+  });
+
+  $('#console-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const cmd = $('#console-in').value.trim();
+    if (!cmd) return;
+    $('#console-in').value = '';
+    await runCmd(cmd);
+  });
+
+  // ---------- arranque ----------
+  (async () => {
+    const { data } = await api('/api/session');
+    if (data && data.authed) showApp(); else showLogin();
+  })();
+})();
+</script>
+</body>
+</html>
