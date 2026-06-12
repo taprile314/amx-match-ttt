@@ -272,6 +272,13 @@
   }
   const rcon = (cmd) => api('/api/rcon', { method: 'POST', body: JSON.stringify({ cmd }) });
 
+  // Envuelve un argumento (ej: tag de equipo) en comillas para que el tokenizador
+  // de la consola GoldSrc lo tome como UN solo argumento aunque tenga espacios.
+  // Sin esto, "RED TEAM" se parsea como dos args y corre todo el resto del comando.
+  // Antes saca los caracteres que romperian el quoting / permitirian inyectar otro
+  // comando: comillas, punto y coma (separador de comandos) y saltos de linea.
+  const quoteArg = (s) => '"' + String(s).replace(/["'`;\r\n]/g, '').trim() + '"';
+
   // ---------- toast ----------
   let toastTimer;
   function toast(msg, isErr) {
@@ -438,7 +445,7 @@
     const fmt = $('#fmt-type').value + $('#fmt-num').value;
     const cfg = $('#cfg').value;
     const rec = $('#rec').checked ? ' recdemo' : '';
-    const cmd = (ct && tt) ? `amx_match ${ct} ${tt} ${fmt} ${cfg}${rec}` : `amx_match2 ${fmt} ${cfg}${rec}`;
+    const cmd = (ct && tt) ? `amx_match ${quoteArg(ct)} ${quoteArg(tt)} ${fmt} ${cfg}${rec}` : `amx_match2 ${fmt} ${cfg}${rec}`;
     await runCmd(cmd); toast('Match iniciado: ' + fmt + ' ' + cfg); refreshStatus();
   });
 

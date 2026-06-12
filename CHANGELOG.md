@@ -33,6 +33,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 - **FFA silencioso al terminar:** en modo fin-de-match no se imprime "Ejecutando config FFA", y se
   comentó el `say FFA config loaded...` en `ffa.cfg`.
 
+### Fixed
+- **Tags de equipo con espacios en el panel rcon.** Al iniciar un match con `amx_match`, los tags
+  CT/T se mandaban sin comillas: un tag con espacio (ej. `RED TEAM`) se partía en dos argumentos y
+  corría todo el resto del comando. Ahora se envuelven en comillas (`quoteArg`) y se sanitizan
+  (se quitan `"`, `'`, `` ` ``, `;` y saltos de línea) antes de mandarlos por rcon.
+
 ### Notes
 - Requiere `#include <fakemeta>` (ya agregado) además de los includes originales.
 - Pendiente de prueba in-game exhaustiva en el engine no-steam del torneo.
