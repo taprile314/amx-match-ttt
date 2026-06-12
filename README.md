@@ -19,7 +19,8 @@ Fork personalizado del plugin **AMX Mod X `amx_match_deluxe` 8.11** (originalmen
 | **Traducción al español** | Sección `[es]` completa en el diccionario `amx_match_deluxe.txt` (sin acentos para compatibilidad de fuente). |
 | **FFA silencioso** | Sin el ruido de "FFA config loaded" / "Ejecutando config FFA" al terminar el match. |
 
-Detalle por commit en [`CHANGELOG.md`](CHANGELOG.md).
+Detalle por commit en [`CHANGELOG.md`](CHANGELOG.md). Comparación completa original vs fork en
+[`docs/ORIGINAL-VS-FORK.md`](docs/ORIGINAL-VS-FORK.md).
 
 ## Estructura del repo
 
