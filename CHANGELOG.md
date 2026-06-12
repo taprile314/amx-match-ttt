@@ -16,6 +16,12 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   `g_unpause_t`; funciones `match_pause`, `pause_hud`, `match_unpause`.
 - **Traducción al español:** sección `[es]` completa en `amx_match_deluxe.txt` (199 claves,
   sin acentos para compatibilidad de fuente del cliente).
+- **Mover jugadores de equipo desde el panel rcon.** Dos comandos admin nuevos:
+  `amx_md_setteam <userid> <ct|t|spec>` (mueve UN jugador usando el helper crash-safe `md_set_team`;
+  al pasar a spec mata el cuerpo si sigue vivo, como `md_all_to_spec`) y `amx_md_teams` (vuelca el
+  equipo de cada jugador en líneas parseables `MDT|userid|team` para que el panel sepa en qué equipo
+  está cada uno — el `status` del engine no lo expone). El `rcon-panel` agrega una columna de equipo
+  y botones CT / TT / SPEC por jugador.
 
 ### Changed
 - **Halftime sin warmup:** al terminar la 1ª mitad, en vez de `warmup_start` se llama a `half_start`

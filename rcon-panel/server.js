@@ -181,7 +181,22 @@ const server = http.createServer(async (req, res) => {
 
       if (req.method === 'GET' && route === '/api/status') {
         const raw = await rcon('status');
-        return json(res, 200, { ok: true, ...parseStatus(raw), raw });
+        const parsed = parseStatus(raw);
+        // El "status" del engine no trae el equipo de cada jugador; lo pide al
+        // plugin (amx_md_teams -> lineas "MDT|userid|team"). Si el plugin viejo
+        // aun no tiene el comando, degradamos: team queda null.
+        try {
+          const teamsRaw = await rcon('amx_md_teams');
+          const byUserid = {};
+          for (const line of teamsRaw.split('\n')) {
+            const m = line.match(/MDT\|(\d+)\|(CT|T|SPEC|UNK)/);
+            if (m) byUserid[+m[1]] = m[2];
+          }
+          for (const p of parsed.players) {
+            p.team = byUserid[p.userid] || null;
+          }
+        } catch (_) { /* plugin sin amx_md_teams: sin info de equipo */ }
+        return json(res, 200, { ok: true, ...parsed, raw });
       }
 
       if (req.method === 'GET' && route === '/api/meta') {

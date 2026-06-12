@@ -71,6 +71,17 @@
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   .empty { color: var(--muted); font-size: 13px; padding: 8px; }
 
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .5px; border: 1px solid var(--border); }
+  .badge.ct   { background: #11233b; color: #6cb6ff; border-color: #1d3a5e; }
+  .badge.t    { background: #3a2410; color: #ffb86c; border-color: #5e3d1d; }
+  .badge.spec { background: #1c1c20; color: var(--muted); }
+  .badge.unk  { background: #1c1c20; color: var(--muted); }
+  .move-btns { display: flex; gap: 4px; }
+  .move-btns button { padding: 3px 8px; font-size: 12px; font-weight: 700; line-height: 1.2; }
+  .move-btns button.to-ct:hover   { border-color: #6cb6ff; color: #6cb6ff; }
+  .move-btns button.to-t:hover    { border-color: #ffb86c; color: #ffb86c; }
+  .move-btns button.to-spec:hover { border-color: var(--muted); }
+
   #console-out {
     background: #08080a; border: 1px solid var(--border); border-radius: 6px;
     padding: 10px; height: 240px; overflow: auto; font-family: Consolas, monospace;
@@ -137,7 +148,7 @@
       <p id="status-summary" class="hint" aria-live="polite"><small class="hint">—</small></p>
       <div id="players-region" aria-live="polite">
         <table id="players-table">
-          <thead><tr><th>#</th><th>Jugador</th><th class="num">Frags</th><th class="num">Ping</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Mover a</th><th class="num">Frags</th><th class="num">Ping</th><th></th></tr></thead>
           <tbody id="players-body"></tbody>
         </table>
         <p id="players-empty" class="empty hidden">No hay jugadores conectados.</p>
@@ -294,13 +305,45 @@
       $('#players-empty').classList.add('hidden');
       for (const p of data.players) {
         const tr = document.createElement('tr');
-        const kickBtn = p.uniqueid === 'BOT' || true; // siempre permitimos kick
         tr.innerHTML = '<td class="num">' + p.slot + '</td>' +
+          '<td></td>' +
+          '<td></td>' +
           '<td></td>' +
           '<td class="num">' + p.frags + '</td>' +
           '<td class="num">' + p.ping + '</td>' +
           '<td style="text-align:right"></td>';
         tr.children[1].textContent = p.name;           // nombre como texto (evita inyeccion)
+
+        // --- equipo actual (badge) ---
+        const TEAM_LABEL = { CT: 'CT', T: 'TT', SPEC: 'SPEC', UNK: '?' };
+        const team = p.team || 'UNK';
+        const badge = document.createElement('span');
+        badge.className = 'badge ' + team.toLowerCase();
+        badge.textContent = TEAM_LABEL[team] || '?';
+        tr.children[2].appendChild(badge);
+
+        // --- botones de mover (oculta el del equipo actual) ---
+        const moveWrap = document.createElement('div');
+        moveWrap.className = 'move-btns';
+        const moves = [
+          { to: 'ct',   label: 'CT',   cls: 'to-ct',   team: 'CT' },
+          { to: 't',    label: 'TT',   cls: 'to-t',    team: 'T' },
+          { to: 'spec', label: 'SPEC', cls: 'to-spec', team: 'SPEC' },
+        ];
+        for (const mv of moves) {
+          if (mv.team === team) continue;              // ya esta en ese equipo
+          const mb = document.createElement('button');
+          mb.type = 'button'; mb.className = mv.cls; mb.textContent = mv.label;
+          mb.title = 'Mover a ' + mv.label;
+          mb.addEventListener('click', async () => {
+            await runCmd('amx_md_setteam ' + p.userid + ' ' + mv.to, { echo: false });
+            toast(p.name + ' → ' + mv.label); refreshStatus();
+          });
+          moveWrap.appendChild(mb);
+        }
+        tr.children[3].appendChild(moveWrap);
+
+        // --- kick ---
         const btn = document.createElement('button');
         btn.type = 'button'; btn.className = 'danger'; btn.textContent = 'Kick';
         btn.addEventListener('click', async () => {
@@ -309,7 +352,7 @@
             toast('Kick enviado'); refreshStatus();
           }
         });
-        tr.children[4].appendChild(btn);
+        tr.children[6].appendChild(btn);
         body.appendChild(tr);
       }
     }

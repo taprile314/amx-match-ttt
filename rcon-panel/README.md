@@ -1,8 +1,14 @@
 # Panel de control web (rcon) — TTT CS 1.6
 
 Panel web para controlar el servidor de Counter-Strike 1.6 por **rcon** desde el navegador:
-cambiar mapa, iniciar/parar matches, kickear, mandar mensajes y una consola rcon libre, con
-estado en vivo (mapa y jugadores).
+cambiar mapa, iniciar/parar matches, **mover jugadores de equipo (CT / TT / SPEC) uno por uno**,
+kickear, mandar mensajes y una consola rcon libre, con estado en vivo (mapa, jugadores y equipo).
+
+> **Mover jugadores de equipo** requiere el plugin `amx_match_deluxe` del torneo **recompilado**
+> (`build.bat`) y recargado (`changelevel`): aporta los comandos `amx_md_setteam <userid> <ct|t|spec>`
+> y `amx_md_teams` (el `status` del engine no expone el equipo, y la native estándar
+> `cs_set_user_team` crashea en la `swds.dll` no-steam del torneo). Con un plugin viejo el panel
+> sigue andando, pero la columna de equipo queda en `?` y los botones de mover no harán efecto.
 
 Hecho en **Node.js con cero dependencias** (módulos nativos `http` + `dgram`). No usa `npm install`.
 

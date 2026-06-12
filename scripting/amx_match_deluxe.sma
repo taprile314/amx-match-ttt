@@ -6034,14 +6034,110 @@ public swap_teams_console(id, level)
 	set_cvar_num("mp_autoteambalance",0)
 	
 	swap_teams()
-	
+
 	misc_restart_round("1")
-	
+
 	return PLUGIN_CONTINUE
 }
 
 
-/* 
+// TTT (rcon-panel): mueve UN jugador a un equipo. Usa el helper crash-safe
+// md_set_team (no cs_set_user_team, que crashea en la swds.dll no-steam).
+// Uso:  amx_md_setteam <userid> <ct|t|spec>
+public md_setteam_console(id, level)
+{
+	if(!access(id, level))
+	{
+		console_print(id,"* [AMX MATCH] %L", id, "COMMAND_NO_AUTH")
+		return PLUGIN_HANDLED
+	}
+
+	new arg_uid[8], arg_team[8]
+	read_argv(1, arg_uid, charsmax(arg_uid))
+	read_argv(2, arg_team, charsmax(arg_team))
+
+	new userid = str_to_num(arg_uid)
+
+	// userid -> indice (sin depender de find_player; robusto)
+	new players[32], num, player = 0
+	get_players(players, num)
+	for(new i = 0; i < num; i++)
+	{
+		if(get_user_userid(players[i]) == userid)
+		{
+			player = players[i]
+			break
+		}
+	}
+
+	if(!player || !is_user_connected(player))
+	{
+		console_print(id,"* [AMX MATCH] userid %d no encontrado", userid)
+		return PLUGIN_HANDLED
+	}
+
+	new CsTeams:team
+	if(equali(arg_team, "ct"))         team = CS_TEAM_CT
+	else if(equali(arg_team, "t"))     team = CS_TEAM_T
+	else if(equali(arg_team, "spec"))  team = CS_TEAM_SPECTATOR
+	else
+	{
+		console_print(id,"* [AMX MATCH] equipo invalido: usa ct|t|spec")
+		return PLUGIN_HANDLED
+	}
+
+	// Que el server no revierta el cambio (limite de equipos / autobalance)
+	set_cvar_num("mp_limitteams", 0)
+	set_cvar_num("mp_autoteambalance", 0)
+
+	md_set_team(player, team)
+
+	// Mismo patron que md_all_to_spec: al pasar a spec, matar el cuerpo si sigue vivo
+	if(team == CS_TEAM_SPECTATOR && is_user_alive(player))
+		dllfunc(DLLFunc_ClientKill, player)
+
+	new pname[32]
+	get_user_name(player, pname, charsmax(pname))
+	client_print(0, print_chat, "* [AMX MATCH] %s -> %s", pname,
+		(team == CS_TEAM_CT) ? "CT" : ((team == CS_TEAM_T) ? "TERRORIST" : "SPECTATOR"))
+
+	return PLUGIN_HANDLED
+}
+
+// TTT (rcon-panel): vuelca el equipo de cada jugador en lineas parseables.
+// Formato por jugador:  MDT|<userid>|<CT|T|SPEC|UNK>
+// El panel rcon llama este comando para saber en que equipo esta cada uno
+// (el "status" del engine no expone el equipo).
+public md_teams_console(id, level)
+{
+	if(!access(id, level))
+	{
+		console_print(id,"* [AMX MATCH] %L", id, "COMMAND_NO_AUTH")
+		return PLUGIN_HANDLED
+	}
+
+	new players[32], num
+	get_players(players, num)
+
+	for(new i = 0; i < num; i++)
+	{
+		new p = players[i]
+		new tag[5]
+		switch(cs_get_user_team(p))
+		{
+			case CS_TEAM_CT:        copy(tag, charsmax(tag), "CT")
+			case CS_TEAM_T:         copy(tag, charsmax(tag), "T")
+			case CS_TEAM_SPECTATOR: copy(tag, charsmax(tag), "SPEC")
+			default:                copy(tag, charsmax(tag), "UNK")
+		}
+		console_print(id, "MDT|%d|%s", get_user_userid(p), tag)
+	}
+
+	return PLUGIN_HANDLED
+}
+
+
+/*
 *
 *		Screenshot Functions
 *
@@ -7417,8 +7513,12 @@ public plugin_init()
 	register_concmd("amx_swapteams","swap_teams_console",AMXMD_ACCESS," - Swap teams")
 	
 	// Randomize teams
-	register_concmd("amx_randomizeteams","randomize_teams",AMXMD_ACCESS," - Randomize teams")	
-	
+	register_concmd("amx_randomizeteams","randomize_teams",AMXMD_ACCESS," - Randomize teams")
+
+	// TTT (rcon-panel): mover un jugador de equipo / volcar equipos
+	register_concmd("amx_md_setteam","md_setteam_console",AMXMD_ACCESS,"<userid> <ct|t|spec>")
+	register_concmd("amx_md_teams","md_teams_console",AMXMD_ACCESS," - Dump team of each player (MDT|userid|team)")
+
 	// Save current cvar config
 	register_concmd("amx_matchsave","save_settings_console",AMXMD_ACCESS," - Save your current match cvar config")
 	
