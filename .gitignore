@@ -1,8 +1,10 @@
-# Artefactos de compilación temporales
+# Artefactos de compilación / build (el .amxx se publica como release asset, no se versiona)
 *.asm
 *.lst
 compiled/
 *.amxx.bak*
+plugins/*.amxx
+dist/
 
 # Backups
 *.bak

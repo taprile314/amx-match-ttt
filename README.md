@@ -26,15 +26,20 @@ Detalle por commit en [`CHANGELOG.md`](CHANGELOG.md). Comparación completa orig
 
 ```
 scripting/amx_match_deluxe.sma     ⭐ fuente del plugin (lo que se edita)
-plugins/amx_match_deluxe.amxx        compilado (deliverable, para deploy directo)
+plugins/amx_match_deluxe.amxx        compilado — NO versionado (release asset / build local)
 data/lang/amx_match_deluxe.txt       diccionario multi-idioma (incluye [es])
 configs/amxmd/amxmd.cfg              config principal del plugin
 configs/amxmd/leagues/*.cfg          configs de liga (cal, ecup, ffa, etc.)
 configs/sql.cfg                      conexión MySQL/MariaDB para stats
 configs/users.ini.example            admins (plantilla — sin credenciales reales)
 docs/GUIA_MATCH.md                   guía operativa de comandos y flujo
-build.bat                            compila el .sma y lo despliega al server
+build.bat                            compila el .sma y lo despliega al server adyacente
+release.bat                          compila + arma bundle .zip + publica GitHub Release
+rcon-panel/                          panel de control web (Node, rcon)
 ```
+
+> El `.amxx` compilado **no se versiona** (está en `.gitignore`). Para deploy, bajá el bundle de la
+> última [Release](https://github.com/taprile314/amx-match-ttt/releases) o compilalo con `build.bat`.
 
 ## Instalar en un server de CS 1.6 + AMX Mod X
 
@@ -63,6 +68,20 @@ build.bat
 
 Compila `scripting/amx_match_deluxe.sma` → `plugins/amx_match_deluxe.amxx` y lo copia al server.
 Si tu AMX Mod X está en otra ruta, editá la variable `AMXX` arriba del `.bat`.
+
+## Releases
+
+El binario no se versiona; cada versión se publica como **GitHub Release** con un bundle de deploy
+adjunto. Para cortar una versión (requiere `gh` logueado y el commit pusheado):
+
+```bat
+release.bat v1.0.0
+```
+
+Compila, arma `dist/amx-match-ttt-v1.0.0.zip` (espeja `addons/amxmodx/` para extraer sobre `cstrike/`,
+incluye `INSTALL.txt`) y crea el Release con ese zip como asset. Antes de cada release, actualizá
+`CHANGELOG.md`. Los usuarios bajan el bundle desde la
+[pestaña Releases](https://github.com/taprile314/amx-match-ttt/releases).
 
 ## Comandos
 

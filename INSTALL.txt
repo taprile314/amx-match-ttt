@@ -1,0 +1,29 @@
+amx-match-ttt - instalacion
+===========================
+
+Este bundle replica la estructura de carpetas de cstrike/. Para instalar:
+
+1. Copia la carpeta "addons" de este zip DENTRO de tu carpeta "cstrike",
+   pisando los archivos del plugin (hace merge con tus addons/amxmodx existentes):
+
+     <tu server>/cstrike/addons/amxmodx/plugins/amx_match_deluxe.amxx
+     <tu server>/cstrike/addons/amxmodx/data/lang/amx_match_deluxe.txt
+     <tu server>/cstrike/addons/amxmodx/configs/amxmd/...
+     <tu server>/cstrike/addons/amxmodx/configs/sql.cfg
+
+2. Renombra "configs/users.ini.example" a "users.ini" y completa tus admins
+   (NO se incluye un users.ini real por seguridad).
+
+3. Asegurate de que addons/amxmodx/configs/plugins.ini cargue:
+     amx_match_deluxe.amxx
+
+4. Para que los textos salgan en espanol, en addons/amxmodx/configs/amxx.cfg:
+     amx_language "es"
+
+5. Reinicia el mapa (changelevel) o el server.
+
+Requiere: Metamod + AMX Mod X 1.10 (con el modulo cstrike/fakemeta) sobre un
+Counter-Strike 1.6 dedicado (hlds).
+
+Comandos y flujo del match: ver docs/GUIA_MATCH.md en el repo
+https://github.com/taprile314/amx-match-ttt
