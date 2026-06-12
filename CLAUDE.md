@@ -30,6 +30,11 @@ build.bat        REM compila scripting\amx_match_deluxe.sma -> plugins\amx_match
 
 ### Releases (publicar una versión)
 
+> ⚠️ **Todavía NO hay release estable `v1.0`.** El plugin (freeze-a-espectador, pausa, halftime sin
+> warmup, etc.) está en fase de ajuste y **falta prueba in-game exhaustiva** en el engine no-steam del
+> torneo. No cortar `v1.0` hasta que el mantenedor lo indique explícitamente — primero se terminan de
+> ajustar los detalles pendientes. `CHANGELOG.md` sigue en `[Unreleased]`.
+
 ```bat
 release.bat v1.0.0
 ```
