@@ -20,7 +20,20 @@ const HEADER = Buffer.from([0xFF, 0xFF, 0xFF, 0xFF]);
 // ---------------------------------------------------------------------------
 // RCON (GoldSrc, UDP)
 // ---------------------------------------------------------------------------
+// El RCON de GoldSrc guarda UN solo challenge por IP cliente: si dos handshakes
+// se solapan, el segundo pisa al primero y el primero recibe "Bad challenge".
+// Serializamos todas las llamadas en una cola (cadena de promesas) para que nunca
+// haya mas de un handshake en vuelo — venga del auto-refresh, de un F5 que dejo un
+// socket viejo esperando, o de botones apurados.
+let rconQueue = Promise.resolve();
 function rcon(command) {
+  const run = () => rconImpl(command);
+  const next = rconQueue.then(run, run); // corre haya fallado o no el anterior
+  rconQueue = next.catch(() => {});      // un fallo no debe cortar la cadena
+  return next;
+}
+
+function rconImpl(command) {
   console.log('[rcon ' + new Date().toISOString() + '] -> ' + command); // log de auditoria de comandos
   return new Promise((resolve, reject) => {
     const sock = dgram.createSocket('udp4');

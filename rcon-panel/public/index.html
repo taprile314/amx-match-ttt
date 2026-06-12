@@ -80,6 +80,8 @@
   button.danger { background: #1f1320; border-color: #5a2320; color: #ff9b91; }
   button.danger:hover { background: #2a1513; border-color: var(--bad); color: #ffb1a8; }
   .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .group { margin-bottom: 13px; }
+  .subhead { font-size: 11px; text-transform: uppercase; color: var(--muted); letter-spacing: .8px; font-weight: 700; margin: 0 0 6px; }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
@@ -205,16 +207,35 @@
     <!-- CONTROL -->
     <section class="card" aria-labelledby="h-ctrl">
       <h2 id="h-ctrl">Control del match</h2>
-      <div class="btns" style="margin-bottom:14px">
-        <button type="button" data-rcon="amx_matchstart">▶ Forzar inicio (/start)</button>
-        <button type="button" class="danger" data-confirm="¿Frenar/cancelar el match?" data-rcon="amx_matchstop">⏹ Detener (/stop)</button>
-        <button type="button" class="danger" data-confirm="¿Reiniciar el match desde cero?" data-rcon="amx_matchrestart">↻ Reiniciar match</button>
-        <button type="button" data-rcon="amx_matchrelo3">↻ Reiniciar mitad</button>
-        <button type="button" data-rcon="sv_restart 1">↻ Reiniciar ronda</button>
-        <button type="button" data-rcon="amx_swapteams">⇄ Swap teams</button>
-        <button type="button" data-rcon="amx_randomizeteams">🎲 Equipos al azar</button>
+
+      <div class="group">
+        <p class="subhead">Partida</p>
+        <div class="btns">
+          <button type="button" data-rcon="amx_matchstart">▶ Forzar inicio (/start)</button>
+          <button type="button" data-rcon="amx_matchpause">⏸ Pausar</button>
+          <button type="button" data-rcon="amx_matchunpause">▶ Despausar</button>
+          <button type="button" class="danger" data-confirm="¿Frenar/cancelar el match?" data-rcon="amx_matchstop">⏹ Detener (/stop)</button>
+        </div>
       </div>
-      <h2 id="h-map">Mapa</h2>
+
+      <div class="group">
+        <p class="subhead">Reiniciar</p>
+        <div class="btns">
+          <button type="button" data-rcon="sv_restart 1">↻ Ronda</button>
+          <button type="button" data-rcon="amx_matchrelo3">↻ Mitad</button>
+          <button type="button" class="danger" data-confirm="¿Reiniciar el match desde cero?" data-rcon="amx_matchrestart">↻ Match</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="subhead">Equipos</p>
+        <div class="btns">
+          <button type="button" data-rcon="amx_swapteams">⇄ Swap teams</button>
+          <button type="button" data-rcon="amx_randomizeteams">🎲 Al azar</button>
+        </div>
+      </div>
+
+      <h2 id="h-map" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">Mapa</h2>
       <div class="row" style="align-items:flex-end">
         <div class="field" style="margin:0"><label for="map-sel">Cambiar a</label><select id="map-sel"></select></div>
         <button type="button" id="map-change" style="flex:0 0 auto">Cambiar mapa</button>
@@ -324,8 +345,14 @@
     const dot = $('#conn-dot'); dot.className = 'dot' + (state ? ' ' + state : '');
     $('#conn-text').textContent = text;
   }
+  let statusInflight = false;
   async function refreshStatus() {
-    const { ok, data } = await api('/api/status');
+    if (statusInflight) return;   // evita apilar pedidos si el server tarda
+    statusInflight = true;
+    let res;
+    try { res = await api('/api/status'); }
+    finally { statusInflight = false; }
+    const { ok, data } = res;
     if (!ok) { setConn('bad', data.error ? 'sin conexión' : 'error'); return; }
     setConn('ok', 'conectado');
     $('#status-summary').innerHTML = '<small class="hint">Mapa: <b style="color:var(--text)">' +

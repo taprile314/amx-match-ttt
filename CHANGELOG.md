@@ -22,8 +22,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   equipo de cada jugador en líneas parseables `MDT|userid|team` para que el panel sepa en qué equipo
   está cada uno — el `status` del engine no lo expone). El `rcon-panel` agrega una columna de equipo
   y botones CT / TT / SPEC por jugador.
+- **Botones de Pausa / Despausa en el panel rcon** (`amx_matchpause` / `amx_matchunpause`), que antes
+  solo se podían disparar tipeándolos en la consola.
 
 ### Changed
+- **"Control del match" reorganizado en el panel:** de una fila plana de botones mezclados a tres
+  subgrupos etiquetados (Partida / Reiniciar / Equipos), con los reinicios ordenados de menos a más
+  destructivo (Ronda → Mitad → Match) y "Mapa" separado por un divisor.
 - **Halftime sin warmup:** al terminar la 1ª mitad, en vez de `warmup_start` se llama a `half_start`
   → la 2ª mitad arranca LIVE directo (estilo CS2/CSGO).
 - **Overtime sin warmup:** misma idea en la rama de overtime.
@@ -38,6 +43,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   CT/T se mandaban sin comillas: un tag con espacio (ej. `RED TEAM`) se partía en dos argumentos y
   corría todo el resto del comando. Ahora se envuelven en comillas (`quoteArg`) y se sanitizan
   (se quitan `"`, `'`, `` ` ``, `;` y saltos de línea) antes de mandarlos por rcon.
+- **Reconexión del panel tras F5.** Al recargar la página el panel quedaba "sin conexión" hasta
+  re-loguearse. Causa: el RCON de GoldSrc guarda un solo challenge por IP, y dos handshakes solapados
+  (el socket que dejaba el F5 + el nuevo) se pisaban ("Bad challenge"). Ahora `server.js` serializa
+  todas las llamadas rcon en una cola (un solo handshake en vuelo) y el cliente saltea pedidos de
+  status apilados con un guard de "request en vuelo".
 
 ### Notes
 - Requiere `#include <fakemeta>` (ya agregado) además de los includes originales.
