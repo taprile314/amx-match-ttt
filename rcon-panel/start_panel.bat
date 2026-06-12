@@ -16,6 +16,19 @@ if errorlevel 1 (
   exit /b 1
 )
 
+echo.
+echo  ============================================================
+echo   Panel de control TTT
+echo   Abrir en el navegador:  http://localhost:8080
+echo  ============================================================
+echo.
+echo  Abriendo el navegador automaticamente...
+
+REM Abrimos el navegador en paralelo: esperamos ~2s a que el server
+REM levante y recien ahi abrimos la pagina (node server.js bloquea esta
+REM ventana, asi que el browser hay que dispararlo en un proceso aparte).
+start "" cmd /c "timeout /t 2 /nobreak >nul & start "" http://localhost:8080"
+
 echo Levantando panel de control TTT...
 node server.js
 
