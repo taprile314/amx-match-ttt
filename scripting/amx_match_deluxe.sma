@@ -391,7 +391,9 @@ md_set_team(id, CsTeams:team)
 // TTT: pausa de match
 #define TASKID_PAUSE_HUD 7001
 #define TASKID_UNPAUSE 7002
-#define FL_FROZEN (1<<26)
+// FL_FROZEN lo provee hlsdk_const.inc (via fakemeta) con el valor correcto de
+// ESTE engine: (1<<12). NO redefinir: el (1<<26) que estaba aca es FL_SPECTATOR
+// en este SDK, por eso la pausa no congelaba (seteaba el bit de espectador).
 
 // Cvars
 
