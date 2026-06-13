@@ -383,6 +383,10 @@ md_set_team(id, CsTeams:team)
 // TTT: pausa de match
 #define TASKID_PAUSE_HUD 7001
 #define TASKID_UNPAUSE 7002
+// Canal HUD fijo y compartido para PAUSA -> countdown -> LIVE. Mismo canal =
+// cada mensaje reemplaza al anterior (con -1/auto caian en canales distintos y
+// se solapaban). Misma posicion (y=0.32) para que sea un solo cartel que muta.
+#define MD_PAUSE_HUDCHAN 4
 // FL_FROZEN lo provee hlsdk_const.inc (via fakemeta) con el valor correcto de
 // ESTE engine: (1<<12). NO redefinir: el (1<<26) que estaba aca es FL_SPECTATOR
 // en este SDK, por eso la pausa no congelaba (seteaba el bit de espectador).
@@ -606,6 +610,7 @@ new g_spec_on_end = 0			// TTT: 1 -> al terminar el match, congelar y mandar a t
 new g_paused = 0				// TTT: 1 -> partida en pausa (jugadores congelados)
 new g_unpause_t = 0				// TTT: contador del countdown de /unpause
 new Float:g_pause_rtime = 0.0	// TTT (port): segundos de ronda que quedan, congelados al pausar
+new Float:g_pause_elapsed = 0.0	// TTT (port): segundos transcurridos de la ronda al pausar (para clavar el reloj)
 new g_msg_roundtime = 0			// TTT (port): cache del msgid "RoundTime"
 
 
@@ -6694,7 +6699,10 @@ public match_pause(id, level)
 	// ronda no expire, y pause_hud() re-manda el RoundTime para clavar el HUD.
 	new Float:rt_start = Float:get_member_game(m_fRoundStartTime)
 	new rt_secs = get_member_game(m_iRoundTimeSecs)
-	g_pause_rtime = float(rt_secs) - (get_gametime() - rt_start)
+	g_pause_elapsed = get_gametime() - rt_start
+	if(g_pause_elapsed < 0.0)
+		g_pause_elapsed = 0.0
+	g_pause_rtime = float(rt_secs) - g_pause_elapsed
 	if(g_pause_rtime < 0.0)
 		g_pause_rtime = 0.0
 	if(!g_msg_roundtime)
@@ -6746,7 +6754,7 @@ public pause_hud()
 		message_end()
 	}
 
-	set_hudmessage(255, 40, 40, -1.0, 0.32, 0, 0.5, 1.2, 0.05, 0.05, -1)
+	set_hudmessage(255, 40, 40, -1.0, 0.32, 0, 0.5, 1.2, 0.05, 0.05, MD_PAUSE_HUDCHAN)
 	show_hudmessage(0, "== PARTIDA EN PAUSA ==^n(esperando al admin)")
 
 	return PLUGIN_CONTINUE
@@ -6771,6 +6779,11 @@ public match_unpause(id, level)
 	if(task_exists(TASKID_UNPAUSE))
 		return PLUGIN_HANDLED
 
+	// TTT (port): cortar el HUD de pausa para reusar el mismo canal con el
+	// countdown. Si no, pause_hud sigue re-mostrando "PAUSA" cada 1s y parpadea
+	// contra el contador. Los jugadores siguen congelados (el flag persiste).
+	remove_task(TASKID_PAUSE_HUD)
+
 	g_unpause_t = 3
 	set_task(1.0, "unpause_tick", TASKID_UNPAUSE, "", 0, "b")
 
@@ -6782,7 +6795,7 @@ public unpause_tick()
 {
 	if(g_unpause_t > 0)
 	{
-		set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 1.1, 0.05, 0.05, -1)
+		set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 1.1, 0.05, 0.05, MD_PAUSE_HUDCHAN)
 		show_hudmessage(0, "Reanudando en %d...", g_unpause_t)
 		g_unpause_t--
 		return PLUGIN_CONTINUE
@@ -6813,7 +6826,7 @@ public unpause_tick()
 		message_end()
 	}
 
-	set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 2.0, 0.1, 0.1, -1)
+	set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 2.0, 0.1, 0.1, MD_PAUSE_HUDCHAN)
 	show_hudmessage(0, "LIVE!")
 	client_print(0, print_chat, "* [AMX MATCH] Partida reanudada.")
 
@@ -6831,9 +6844,11 @@ public md_pause_frame()
 	if(!g_paused)
 		return FMRES_IGNORED
 
-	new Float:ft = global_get(glb_frametime)
-	new Float:start = Float:get_member_game(m_fRoundStartTime)
-	set_member_game(m_fRoundStartTime, start + ft)
+	// Pinear el inicio de la ronda relativo al tiempo actual del server: mantiene
+	// "transcurrido = gametime - m_fRoundStartTime = g_pause_elapsed" constante, asi
+	// el reloj de ronda queda clavado. (Usamos get_gametime() en vez de glb_frametime:
+	// global_get(glb_frametime) devuelve "Invalid return type" en este fakemeta.)
+	set_member_game(m_fRoundStartTime, get_gametime() - g_pause_elapsed)
 
 	return FMRES_IGNORED
 }
