@@ -325,34 +325,26 @@ new const AMXMD_AUTHOR[] = "Infra"
 #include <cstrike>
 #include <fakemeta>
 #include <regex>
+#include <reapi>		// TTT (port ReHLDS): natives de ReGameDLL (rg_set_user_team, get/set_member_game)
 
-// Crash-safe team change. Esta engine (swds.dll de 2005, no-steam) no matchea
-// el gamedata de AMXX 1.10, por lo que la firma de cs_set_user_team apunta mal
-// y crashea el server al cambiar de equipo. Cambiamos el equipo por offset de
-// pdata (m_iTeam) + pev_team + TeamInfo, sin tocar la native rota.
-#define MD_TEAM_OFFSET 114   // m_iTeam (Windows)
-
+// Cambio de equipo via ReAPI. En el stack ReHLDS el gamedll es ReGameDLL, asi
+// que la native nativa funciona bien: rg_set_user_team setea m_iTeam, asigna un
+// modelo valido del equipo y manda el TeamInfo solo. Reemplaza el viejo hack del
+// offset 114 de pdata que hacia falta sobre la swds stock no-steam (ahi
+// cs_set_user_team crasheaba). check_win_conditions=false (default): no disparar
+// chequeos de victoria al hacer swaps/movidas administrativas.
 md_set_team(id, CsTeams:team)
 {
-	set_pdata_int(id, MD_TEAM_OFFSET, _:team)
-	set_pev(id, pev_team, _:team)
-
-	new szTeam[12]
+	new TeamName:rgTeam
 	switch(team)
 	{
-		case CS_TEAM_T:         copy(szTeam, charsmax(szTeam), "TERRORIST")
-		case CS_TEAM_CT:        copy(szTeam, charsmax(szTeam), "CT")
-		case CS_TEAM_SPECTATOR: copy(szTeam, charsmax(szTeam), "SPECTATOR")
-		default:                copy(szTeam, charsmax(szTeam), "UNASSIGNED")
+		case CS_TEAM_T:         rgTeam = TEAM_TERRORIST
+		case CS_TEAM_CT:        rgTeam = TEAM_CT
+		case CS_TEAM_SPECTATOR: rgTeam = TEAM_SPECTATOR
+		default:                rgTeam = TEAM_UNASSIGNED
 	}
 
-	static msgTeamInfo
-	if(!msgTeamInfo) msgTeamInfo = get_user_msgid("TeamInfo")
-
-	message_begin(MSG_ALL, msgTeamInfo)
-	write_byte(id)
-	write_string(szTeam)
-	message_end()
+	rg_set_user_team(id, rgTeam)
 }
 
 
@@ -613,6 +605,8 @@ new vote_option[2]				// vote_option[0] -> Yes's, vote_option[1] -> No's
 new g_spec_on_end = 0			// TTT: 1 -> al terminar el match, congelar y mandar a todos a espectador
 new g_paused = 0				// TTT: 1 -> partida en pausa (jugadores congelados)
 new g_unpause_t = 0				// TTT: contador del countdown de /unpause
+new Float:g_pause_rtime = 0.0	// TTT (port): segundos de ronda que quedan, congelados al pausar
+new g_msg_roundtime = 0			// TTT (port): cache del msgid "RoundTime"
 
 
 // HLTV Stuff
@@ -6695,6 +6689,17 @@ public match_pause(id, level)
 
 	g_paused = 1
 
+	// TTT (port): congelar el RELOJ de la ronda. Guardamos los segundos que
+	// quedan; md_pause_frame() empuja m_fRoundStartTime frame a frame para que la
+	// ronda no expire, y pause_hud() re-manda el RoundTime para clavar el HUD.
+	new Float:rt_start = Float:get_member_game(m_fRoundStartTime)
+	new rt_secs = get_member_game(m_iRoundTimeSecs)
+	g_pause_rtime = float(rt_secs) - (get_gametime() - rt_start)
+	if(g_pause_rtime < 0.0)
+		g_pause_rtime = 0.0
+	if(!g_msg_roundtime)
+		g_msg_roundtime = get_user_msgid("RoundTime")
+
 	// Congelar + godmode a todos los vivos
 	new players[32], num, pl
 	get_players(players, num, "a")
@@ -6730,6 +6735,15 @@ public pause_hud()
 		pl = players[i]
 		set_pev(pl, pev_flags, pev(pl, pev_flags) | FL_FROZEN)
 		set_pev(pl, pev_takedamage, 0.0)
+	}
+
+	// TTT (port): re-mandar el RoundTime congelado para que el HUD del cliente
+	// (que cuenta solo del lado cliente) quede clavado en el valor de la pausa.
+	if(g_msg_roundtime)
+	{
+		message_begin(MSG_BROADCAST, g_msg_roundtime)
+		write_short(floatround(g_pause_rtime))
+		message_end()
 	}
 
 	set_hudmessage(255, 40, 40, -1.0, 0.32, 0, 0.5, 1.2, 0.05, 0.05, -1)
@@ -6789,11 +6803,39 @@ public unpause_tick()
 
 	g_paused = 0
 
+	// TTT (port): resync final del RoundTime al valor congelado. El server quedo
+	// posicionado para que "restante = g_pause_rtime", asi cliente y server
+	// arrancan a contar juntos desde el mismo numero.
+	if(g_msg_roundtime)
+	{
+		message_begin(MSG_BROADCAST, g_msg_roundtime)
+		write_short(floatround(g_pause_rtime))
+		message_end()
+	}
+
 	set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 2.0, 0.1, 0.1, -1)
 	show_hudmessage(0, "LIVE!")
 	client_print(0, print_chat, "* [AMX MATCH] Partida reanudada.")
 
 	return PLUGIN_CONTINUE
+}
+
+
+// TTT (port ReHLDS): mientras la partida esta en pausa, empuja el inicio de la
+// ronda hacia adelante por el delta de cada frame. Asi "tiempo transcurrido =
+// gametime - m_fRoundStartTime" no avanza y la ronda NUNCA expira durante la
+// pausa: congela el reloj del lado server. El HUD del cliente lo clava pause_hud()
+// re-mandando el RoundTime. Sin pausa, sale en un solo chequeo (overhead nulo).
+public md_pause_frame()
+{
+	if(!g_paused)
+		return FMRES_IGNORED
+
+	new Float:ft = global_get(glb_frametime)
+	new Float:start = Float:get_member_game(m_fRoundStartTime)
+	set_member_game(m_fRoundStartTime, start + ft)
+
+	return FMRES_IGNORED
 }
 
 
@@ -7510,6 +7552,9 @@ public plugin_init()
 	// TTT: pausa / despausa de match
 	register_concmd("amx_matchpause","match_pause",AMXMD_ACCESS," - Pause the match")
 	register_concmd("amx_matchunpause","match_unpause",AMXMD_ACCESS," - Unpause the match")
+
+	// TTT (port ReHLDS): hook por frame para congelar el reloj de ronda en pausa
+	register_forward(FM_StartFrame, "md_pause_frame")
 
 	// Swap teams
 	register_concmd("amx_swapteams","swap_teams_console",AMXMD_ACCESS," - Swap teams")
