@@ -608,6 +608,7 @@ new vote_option[2]				// vote_option[0] -> Yes's, vote_option[1] -> No's
 
 new g_spec_on_end = 0			// TTT: 1 -> al terminar el match, congelar y mandar a todos a espectador
 new g_winner_name[32]			// TTT: nombre del equipo ganador, para el HUD de fin de match ("" = empate)
+new g_knife_decider = 0			// TTT: 1 -> el knife round en curso es el desempate (reemplaza al overtime); al ganarlo se define el match
 new g_paused = 0				// TTT: 1 -> partida en pausa (jugadores congelados)
 new g_unpause_t = 0				// TTT: contador del countdown de /unpause
 new Float:g_pause_rtime = 0.0	// TTT (port): segundos de ronda que quedan, congelados al pausar
@@ -1252,10 +1253,9 @@ public half_start_force(id)
 public half_stop()
 {
 	new hud_message[256]
-	new string_matchtype[32]
-	
+
 	new temp[32]
-	
+
 	new text[1024]
 	
 	new ct_score = main_score_ct[0] + main_score_ct[1] + main_score_2mm_ct + main_score_overtime
@@ -1433,50 +1433,13 @@ public half_stop()
 					copy(g_winner_name, charsmax(g_winner_name), main_clanT)	// TTT: ganador para el HUD de fin de match
 					main_inovertime = 0
 				}
-				else if (get_cvar_num("amx_match_overtime") && (get_cvar_num("amx_match_otunlimited") || (main_inovertime != 1)) ) // Match draw and (in unlimited overtime or not in overtime)...start overtime
+				else if (get_cvar_num("amx_match_overtime")) // TTT: empate -> se define con un KNIFE ROUND (reemplaza al overtime)
 				{
-					main_inprogress = 0
-					
-					// Initialize the scores
-					main_score_ct[0] = 0
-					main_score_ct[1] = 0
-			
-					main_score_t[0] = 0
-					main_score_t[1] = 0
-					
-					// Overtime Score
-					if( (main_inovertime == 1) ) // We were already in overtime
-					{
-						main_score_overtime += ( get_cvar_num("amx_match_otlength") * 2 )
-					}
-					else // We are just starting overtime
-					{
-						main_score_overtime = main_command_matchlength
-					}
-					
-					main_inovertime = 1
-					
-					main_command_matchlength = get_cvar_num("amx_match_otlength")
-					
-					switch( main_command_matchtype )
-					{
-						case 1: // Playing maxround
-						{
-							format(string_matchtype, 31, "%L", LANG_PLAYER, "MAX_ROUND")
-						}
-						case 2: // Playing timelimit
-						{
-							format(string_matchtype, 31, "%L", LANG_PLAYER, "TIME_LIMIT")
-						}
-						case 3: // Playing winlimit
-						{
-							format(string_matchtype, 31, "%L", LANG_PLAYER, "WIN_LIMIT")
-						}
-					}
-					
-					format(hud_message, 255,"%L %i/%i ^n^n%L (%s %i)", LANG_PLAYER, "DRAW_MATCH_SCORE", ct_score, t_score, LANG_PLAYER, "PLAY_OVERTIME", string_matchtype, main_command_matchlength)
+					g_knife_decider = 1
+					main_inovertime = 0
+					format(hud_message, 255, "EMPATE %i/%i^n^nSe define con un KNIFE ROUND!", ct_score, t_score)
 				}
-				else	// Match draw
+				else	// Match draw (sin desempate: amx_match_overtime 0)
 				{
 					format(hud_message,255,"%L %i/%i", LANG_PLAYER, "DRAW_MATCH_SCORE", ct_score, t_score)
 					g_winner_name[0] = 0	// TTT: empate, sin ganador para el HUD de fin de match
@@ -1499,33 +1462,44 @@ public half_stop()
 				vote_areVoting = 0
 				
 				
-				if (main_inovertime == 1) // If we just started overtime
+				if (main_inovertime == 1) // If we just started overtime (legacy: el empate ahora va a knife, no se entra aca)
 				{
 					// Stop demos
 					if (main_command_demotype > 0)
 					{
 						demo_stop()
 					}
-					
+
 					// Swap teams
 					if (get_cvar_num("amx_match_swaptype") == 1)
 					{
 						set_task(1.5, "swap_teams")
 					}
-					
+
 					// Swap team names as well if in a non-clan match
 					if(main_command_type == 2 || main_command_type == 4)
 					{
 						format(main_clanCT, 31, "Counter-terrorists")
-						format(main_clanT, 31, "Terrorists")			
+						format(main_clanT, 31, "Terrorists")
 					}
-					
+
 					match_increment_inprogress()
-					
+
 					set_task(5.5, "misc_restart_round", 0, "1", 1 )
-					
+
 					// Seamless overtime: skip warmup, go straight to OT LIVE
 					set_task(7.0, "half_start")
+				}
+				else if (g_knife_decider) // TTT: empate -> arrancar el knife round decisivo (muerte subita)
+				{
+					// Reinicia la ronda y la deja como knife round: main_inprogress = 5
+					// (estado knife, no cuenta score) + main_inkniferound = 1 (fuerza cuchillo
+					// via kniferound_onchangeweapon). Al ganar la ronda, kniferound_teamwin
+					// detecta el equipo y md_knife_decider_finish() define el match.
+					misc_restart_round("3")
+					main_inprogress = 5
+					main_inkniferound = 1
+					set_task(5.0, "kniferound_start")
 				}
 				else
 				{
@@ -1923,21 +1897,49 @@ public kniferound_teamwin()
 		if (param[7]=='c') //%!MRAD_ctwin
 		{
 			main_kniferound_won = 2	// The cts won
-				
+
 			// kniferound_stop()
-			
-			kniferound_vote_team()
+
+			if(g_knife_decider) md_knife_decider_finish()	// TTT: knife de desempate -> define el match
+			else kniferound_vote_team()
 		}
 		else //%!MRAD_terwin
 		{
 			main_kniferound_won = 1	// The ts won
-				
+
 			// kniferound_stop()
-			
-			kniferound_vote_team()
+
+			if(g_knife_decider) md_knife_decider_finish()	// TTT: knife de desempate -> define el match
+			else kniferound_vote_team()
 		}
 	}
-	
+
+	return PLUGIN_CONTINUE
+}
+
+// TTT: el knife round de desempate termino. El equipo que gano la ronda
+// (main_kniferound_won: 2=CT, 1=T) gana el MATCH. Setea el ganador para el HUD de
+// fin de match y dispara el freeze a espectador, igual que un fin de match normal.
+public md_knife_decider_finish()
+{
+	main_inkniferound = 0
+	g_knife_decider = 0
+	main_kniferound_done = 1
+
+	if(main_kniferound_won == 2)
+		copy(g_winner_name, charsmax(g_winner_name), main_clanCT)
+	else
+		copy(g_winner_name, charsmax(g_winner_name), main_clanT)
+
+	main_kniferound_won = 0
+
+	set_hudmessage(255, 255, 255, -1.0, 0.30, 0, 2.0, 8.0, 0.8, 0.8, -1)
+	show_hudmessage(0, "%L^n^nEL GANADOR ES %s", LANG_PLAYER, "MATCH_FINISHED", g_winner_name)
+
+	// Fin de match -> freeze a espectador (mismo flujo que el fin natural)
+	g_spec_on_end = 1
+	set_task(4.0, "uninit")
+
 	return PLUGIN_CONTINUE
 }
 
@@ -7022,6 +7024,7 @@ public uninit_variables()
 	main_inkniferound = 0
 	main_kniferound_won = 0
 	main_kniferound_done = 0
+	g_knife_decider = 0	// TTT: limpiar el flag del knife de desempate
 
 
 	return PLUGIN_CONTINUE

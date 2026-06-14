@@ -15,6 +15,13 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 - **Cartel "EL GANADOR ES &lt;equipo&gt;"** en la pantalla de fin de match. `md_all_to_spec()` arma el
   HUD con el nombre del equipo ganador, capturado en el bloque de resolución del marcador (global
   `g_winner_name`: `main_clanCT` / `main_clanT` según quién ganó, vacío = empate → muestra "EMPATE").
+- **Desempate por knife round (reemplaza al overtime).** Cuando el match termina empatado y
+  `amx_match_overtime` está en 1, en vez de jugar overtime se juega **un knife round de muerte súbita**:
+  el equipo que gana esa ronda gana el match. Flag `g_knife_decider`; reusa el sistema de knife round
+  existente (`main_inkniferound` fuerza cuchillo, `kniferound_teamwin` detecta el ganador vía el sonido
+  de radio) pero, en vez del voto de lado del knife de inicio, llama a `md_knife_decider_finish()` que
+  setea `g_winner_name` con el clan ganador y dispara el freeze a espectador con el cartel
+  "EL GANADOR ES …". Si `amx_match_overtime` está en 0, el empate termina como empate (sin desempate).
 
 ### Fixed
 - **El freeze a espectador fallaba con presets de liga restrictivos.** Las configs `cal`/`calot`
