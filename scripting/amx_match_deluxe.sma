@@ -607,11 +607,16 @@ new vote_areVoting = 0 			// This flag is to check if a vote is already happenin
 new vote_option[2]				// vote_option[0] -> Yes's, vote_option[1] -> No's
 
 new g_spec_on_end = 0			// TTT: 1 -> al terminar el match, congelar y mandar a todos a espectador
+new g_winner_name[32]			// TTT: nombre del equipo ganador, para el HUD de fin de match ("" = empate)
 new g_paused = 0				// TTT: 1 -> partida en pausa (jugadores congelados)
 new g_unpause_t = 0				// TTT: contador del countdown de /unpause
 new Float:g_pause_rtime = 0.0	// TTT (port): segundos de ronda que quedan, congelados al pausar
 new Float:g_pause_elapsed = 0.0	// TTT (port): segundos transcurridos de la ronda al pausar (para clavar el reloj)
 new g_msg_roundtime = 0			// TTT (port): cache del msgid "RoundTime"
+new g_pause_c4 = 0				// TTT (port): entidad de la C4 plantada al pausar (0 = no habia bomba)
+new Float:g_pause_c4_left = 0.0	// TTT (port): segundos para detonar la C4, congelados al pausar
+new g_pause_in_freeze = 0		// TTT (port): 1 -> se pauso durante el freezetime (compra de inicio de ronda)
+new Float:g_pause_freeze_left = 0.0	// TTT (port): segundos que le quedaban al freezetime, congelados al pausar
 
 
 // HLTV Stuff
@@ -1419,11 +1424,13 @@ public half_stop()
 				if (ct_score > t_score) // CT's won
 				{
 					format(hud_message,255,"%s %L %i/%i", main_clanCT, LANG_PLAYER, "WITH_THE_SCORE_OF", ct_score, t_score)
+					copy(g_winner_name, charsmax(g_winner_name), main_clanCT)	// TTT: ganador para el HUD de fin de match
 					main_inovertime = 0
 				}
 				else if (ct_score < t_score) // Ts won
 				{
 					format(hud_message,255,"%s %L %i/%i ", main_clanT, LANG_PLAYER, "WITH_THE_SCORE_OF", t_score, ct_score)
+					copy(g_winner_name, charsmax(g_winner_name), main_clanT)	// TTT: ganador para el HUD de fin de match
 					main_inovertime = 0
 				}
 				else if (get_cvar_num("amx_match_overtime") && (get_cvar_num("amx_match_otunlimited") || (main_inovertime != 1)) ) // Match draw and (in unlimited overtime or not in overtime)...start overtime
@@ -1472,6 +1479,7 @@ public half_stop()
 				else	// Match draw
 				{
 					format(hud_message,255,"%L %i/%i", LANG_PLAYER, "DRAW_MATCH_SCORE", ct_score, t_score)
+					g_winner_name[0] = 0	// TTT: empate, sin ganador para el HUD de fin de match
 					main_inovertime = 0
 				}
 				
@@ -6137,6 +6145,53 @@ public md_teams_console(id, level)
 	return PLUGIN_HANDLED
 }
 
+// TTT (rcon-panel): vuelca las estadisticas del match en lineas parseables.
+//   MDS|T|<ct_rounds>|<t_rounds>                                  -> score de rondas
+//   MDS|P|<userid>|<authid>|<kills>|<deaths>|<CT|T|SPEC|UNK>|<name> -> por jugador
+// El score de rondas es el real del plugin (suma 1a + 2a mitad + 2-map + overtime).
+// Kills = frags del marcador (engine); muertes = cs_get_user_deaths. El panel rcon
+// consulta este comando para mostrar el marcador del partido y acumular el torneo.
+// authid (steamid) es la clave estable para acumular entre matches.
+public md_stats_console(id, level)
+{
+	if(!access(id, level))
+	{
+		console_print(id,"* [AMX MATCH] %L", id, "COMMAND_NO_AUTH")
+		return PLUGIN_HANDLED
+	}
+
+	new ct_score = main_score_ct[0] + main_score_ct[1] + main_score_2mm_ct + main_score_overtime
+	new t_score  = main_score_t[0]  + main_score_t[1]  + main_score_2mm_t  + main_score_overtime
+	console_print(id, "MDS|T|%d|%d", ct_score, t_score)
+
+	new players[32], num
+	get_players(players, num)
+
+	for(new i = 0; i < num; i++)
+	{
+		new p = players[i]
+		new tag[5]
+		switch(cs_get_user_team(p))
+		{
+			case CS_TEAM_CT:        copy(tag, charsmax(tag), "CT")
+			case CS_TEAM_T:         copy(tag, charsmax(tag), "T")
+			case CS_TEAM_SPECTATOR: copy(tag, charsmax(tag), "SPEC")
+			default:                copy(tag, charsmax(tag), "UNK")
+		}
+
+		new authid[40], name[32]
+		get_user_authid(p, authid, charsmax(authid))
+		get_user_name(p, name, charsmax(name))
+		// el '|' es el separador del protocolo: saneamos por si esta en el nombre
+		replace_all(name, charsmax(name), "|", " ")
+
+		console_print(id, "MDS|P|%d|%s|%d|%d|%s|%s",
+			get_user_userid(p), authid, get_user_frags(p), cs_get_user_deaths(p), tag, name)
+	}
+
+	return PLUGIN_HANDLED
+}
+
 
 /*
 *
@@ -6649,6 +6704,14 @@ public md_all_to_spec()
 {
 	new players[32], num, id
 
+	// TTT: los presets de liga (cal/calot) traen "allow_spectators 0" y algunos
+	// "sv_maxspectators 1". Con eso, el server rebota a los jugadores cuando los
+	// mandamos a espectador al terminar el match. Habilitamos espectadores y
+	// abrimos los slots antes de mover a nadie, asi el freeze-a-spec funciona
+	// sin importar con que config se arranco el match.
+	set_cvar_num("allow_spectators", 1)
+	set_cvar_num("sv_maxspectators", 32)
+
 	get_players(players, num)
 
 	for(new i = 0; i < num; i++)
@@ -6665,8 +6728,22 @@ public md_all_to_spec()
 			dllfunc(DLLFunc_ClientKill, id)
 	}
 
+	new end_msg[256]
+
+	if(g_winner_name[0])
+	{
+		formatex(end_msg, charsmax(end_msg),
+			"================================^n        MATCH  TERMINADO^n================================^n^nEL GANADOR ES %s^n^nTodos en modo espectador.^nEsperando al admin para el proximo match.",
+			g_winner_name)
+	}
+	else
+	{
+		formatex(end_msg, charsmax(end_msg),
+			"================================^n        MATCH  TERMINADO^n================================^n^nEMPATE^n^nTodos en modo espectador.^nEsperando al admin para el proximo match.")
+	}
+
 	set_hudmessage(255, 40, 40, -1.0, 0.32, 0, 0.0, 15.0, 0.15, 0.5, -1)
-	show_hudmessage(0, "================================^n        MATCH  TERMINADO^n================================^n^nTodos en modo espectador.^nEsperando al admin para el proximo match.")
+	show_hudmessage(0, end_msg)
 
 	return PLUGIN_CONTINUE
 }
@@ -6708,6 +6785,41 @@ public match_pause(id, level)
 	if(!g_msg_roundtime)
 		g_msg_roundtime = get_user_msgid("RoundTime")
 
+	// TTT (port): si hay una C4 plantada, congelar tambien su detonacion. Buscamos
+	// la entidad "grenade" que es el C4 (m_Grenade_bIsC4) y que todavia no exploto,
+	// y guardamos cuanto le falta; md_pause_frame() re-pinea su blow time cada frame.
+	g_pause_c4 = 0
+	new c4ent = -1
+	while((c4ent = engfunc(EngFunc_FindEntityByString, c4ent, "classname", "grenade")) > 0)
+	{
+		if(get_member(c4ent, m_Grenade_bIsC4) && !get_member(c4ent, m_Grenade_bJustBlew))
+		{
+			new Float:blow = Float:get_member(c4ent, m_Grenade_flC4Blow)
+			if(blow > get_gametime())
+			{
+				g_pause_c4 = c4ent
+				g_pause_c4_left = blow - get_gametime()
+			}
+			break
+		}
+	}
+
+	// TTT (port): si la pausa cae durante el FREEZETIME (la compra de inicio de
+	// ronda), congelar tambien el fin del freeze. El freeze termina en tiempo real
+	// cuando gametime >= m_fRoundStartTimeReal, valor que md_pause_frame NO pinea por
+	// defecto -> sin esto el freezetime se vence durante la pausa y la ronda se va a
+	// LIVE por debajo. Guardamos los segundos que le quedan; md_pause_frame re-pinea
+	// m_fRoundStartTimeReal cada frame para que el periodo de compra no expire.
+	g_pause_in_freeze = 0
+	if(get_member_game(m_bFreezePeriod))
+	{
+		new Float:freeze_end = Float:get_member_game(m_fRoundStartTimeReal)
+		g_pause_freeze_left = freeze_end - get_gametime()
+		if(g_pause_freeze_left < 0.0)
+			g_pause_freeze_left = 0.0
+		g_pause_in_freeze = 1
+	}
+
 	// Congelar + godmode a todos los vivos
 	new players[32], num, pl
 	get_players(players, num, "a")
@@ -6724,6 +6836,29 @@ public match_pause(id, level)
 	client_print(0, print_chat, "* [AMX MATCH] PARTIDA EN PAUSA por el admin. Esperen a /unpause.")
 
 	return PLUGIN_HANDLED
+}
+
+
+// TTT (port): re-manda por RoundTime el valor CONGELADO correcto para clavar el HUD
+// del cliente (que cuenta solo del lado cliente). Si hay una C4 plantada, manda los
+// segundos que le quedan a la BOMBA (g_pause_c4_left) en vez del tiempo de ronda, asi
+// el HUD sigue mostrando el timer de la C4 (consistente con c4timer) y al reanudar
+// vuelve solo. Sin esto, al pausar con la bomba plantada el numero saltaba al tiempo
+// de ronda y nunca volvia al de la bomba.
+md_send_frozen_time()
+{
+	if(!g_msg_roundtime)
+		return
+
+	new frozen_secs
+	if(g_pause_c4 > 0 && pev_valid(g_pause_c4))
+		frozen_secs = floatround(g_pause_c4_left)
+	else
+		frozen_secs = floatround(g_pause_rtime)
+
+	message_begin(MSG_BROADCAST, g_msg_roundtime)
+	write_short(frozen_secs)
+	message_end()
 }
 
 
@@ -6745,14 +6880,9 @@ public pause_hud()
 		set_pev(pl, pev_takedamage, 0.0)
 	}
 
-	// TTT (port): re-mandar el RoundTime congelado para que el HUD del cliente
-	// (que cuenta solo del lado cliente) quede clavado en el valor de la pausa.
-	if(g_msg_roundtime)
-	{
-		message_begin(MSG_BROADCAST, g_msg_roundtime)
-		write_short(floatround(g_pause_rtime))
-		message_end()
-	}
+	// TTT (port): re-mandar el RoundTime congelado (bomba si hay C4 plantada, si no
+	// el tiempo de ronda) para que el HUD del cliente quede clavado en la pausa.
+	md_send_frozen_time()
 
 	set_hudmessage(255, 40, 40, -1.0, 0.32, 0, 0.5, 1.2, 0.05, 0.05, MD_PAUSE_HUDCHAN)
 	show_hudmessage(0, "== PARTIDA EN PAUSA ==^n(esperando al admin)")
@@ -6816,15 +6946,11 @@ public unpause_tick()
 
 	g_paused = 0
 
-	// TTT (port): resync final del RoundTime al valor congelado. El server quedo
-	// posicionado para que "restante = g_pause_rtime", asi cliente y server
-	// arrancan a contar juntos desde el mismo numero.
-	if(g_msg_roundtime)
-	{
-		message_begin(MSG_BROADCAST, g_msg_roundtime)
-		write_short(floatround(g_pause_rtime))
-		message_end()
-	}
+	// TTT (port): resync final del RoundTime al valor congelado. Si habia C4 plantada
+	// manda los segundos de la bomba (asi vuelve el timer de la C4 al reanudar); si no,
+	// el tiempo de ronda. El server quedo posicionado para que "restante = ese valor",
+	// asi cliente y server arrancan a contar juntos desde el mismo numero.
+	md_send_frozen_time()
 
 	set_hudmessage(0, 255, 0, -1.0, 0.32, 0, 0.5, 2.0, 0.1, 0.1, MD_PAUSE_HUDCHAN)
 	show_hudmessage(0, "LIVE!")
@@ -6849,6 +6975,16 @@ public md_pause_frame()
 	// el reloj de ronda queda clavado. (Usamos get_gametime() en vez de glb_frametime:
 	// global_get(glb_frametime) devuelve "Invalid return type" en este fakemeta.)
 	set_member_game(m_fRoundStartTime, get_gametime() - g_pause_elapsed)
+
+	// TTT (port): si habia C4 plantada, re-pinear su detonacion para que NO explote
+	// durante la pausa (al despausar le quedan los mismos segundos que tenia).
+	if(g_pause_c4 > 0 && pev_valid(g_pause_c4))
+		set_member(g_pause_c4, m_Grenade_flC4Blow, get_gametime() + g_pause_c4_left)
+
+	// TTT (port): si se pauso durante el freezetime, re-pinear el fin del freeze para
+	// que el periodo de compra NO se venza durante la pausa (gametime siempre < fin).
+	if(g_pause_in_freeze)
+		set_member_game(m_fRoundStartTimeReal, get_gametime() + g_pause_freeze_left)
 
 	return FMRES_IGNORED
 }
@@ -7547,48 +7683,49 @@ public plugin_init()
 
 	// Console commands
 	#if defined(AMXMD_USE_HLTV)
-	register_concmd("amx_match","match_start",AMXMD_ACCESS,"<CT's clan tag> <T's clan tag> <mrXX or tlXX> <Config filename> [recdemo|rechltv|recboth]")
-	register_concmd("amx_match2","match_start",AMXMD_ACCESS,"<mrXX or tlXX> <Config filename> [recdemo|rechltv|recboth]")
-	register_concmd("amx_match3","match_start",AMXMD_ACCESS,"<CT's clan tag> <T's clan tag> <mrXX or tlXX> <Config filename> <Second map> [recdemo|rechltv|recboth]")
-	register_concmd("amx_match4","match_start",AMXMD_ACCESS,"<mrXX or tlXX> <Config filename> <Second map> [recdemo|rechltv|recboth]")
+	register_concmd("amx_match","match_start",AMXMD_ACCESS,"<clantag CT> <clantag T> <mrXX o tlXX> <archivo de config> [recdemo|rechltv|recboth]")
+	register_concmd("amx_match2","match_start",AMXMD_ACCESS,"<mrXX o tlXX> <archivo de config> [recdemo|rechltv|recboth]")
+	register_concmd("amx_match3","match_start",AMXMD_ACCESS,"<clantag CT> <clantag T> <mrXX o tlXX> <archivo de config> <segundo mapa> [recdemo|rechltv|recboth]")
+	register_concmd("amx_match4","match_start",AMXMD_ACCESS,"<mrXX o tlXX> <archivo de config> <segundo mapa> [recdemo|rechltv|recboth]")
 	#else
-	register_concmd("amx_match","match_start",AMXMD_ACCESS,"<CT's clan tag> <T's clan tag> <mrXX or tlXX> <Config filename> [recdemo]")
-	register_concmd("amx_match2","match_start",AMXMD_ACCESS,"<mrXX or tlXX> <Config filename> [recdemo]")
-	register_concmd("amx_match3","match_start",AMXMD_ACCESS,"<CT's clan tag> <T's clan tag> <mrXX or tlXX> <Config filename> <Second map> [recdemo]")
-	register_concmd("amx_match4","match_start",AMXMD_ACCESS,"<mrXX or tlXX> <Config filename> <Second map> [recdemo]")
+	register_concmd("amx_match","match_start",AMXMD_ACCESS,"<clantag CT> <clantag T> <mrXX o tlXX> <archivo de config> [recdemo]")
+	register_concmd("amx_match2","match_start",AMXMD_ACCESS,"<mrXX o tlXX> <archivo de config> [recdemo]")
+	register_concmd("amx_match3","match_start",AMXMD_ACCESS,"<clantag CT> <clantag T> <mrXX o tlXX> <archivo de config> <segundo mapa> [recdemo]")
+	register_concmd("amx_match4","match_start",AMXMD_ACCESS,"<mrXX o tlXX> <archivo de config> <segundo mapa> [recdemo]")
 	#endif
 	
 	// Start...Stop...Restart
-	register_concmd("amx_matchrestart","match_restart",AMXMD_ACCESS," - Restart a match")
-	register_concmd("amx_matchrelo3","half_restart",AMXMD_ACCESS," - Restart the current half")
-	register_concmd("amx_matchstart","half_start_force",AMXMD_ACCESS," - Force a match to start")
-	register_concmd("amx_matchstop","match_stop",AMXMD_ACCESS," - Stop a match")
+	register_concmd("amx_matchrestart","match_restart",AMXMD_ACCESS," - Reiniciar un match")
+	register_concmd("amx_matchrelo3","half_restart",AMXMD_ACCESS," - Reiniciar la mitad actual")
+	register_concmd("amx_matchstart","half_start_force",AMXMD_ACCESS," - Forzar el inicio de un match")
+	register_concmd("amx_matchstop","match_stop",AMXMD_ACCESS," - Detener un match")
 
 	// TTT: pausa / despausa de match
-	register_concmd("amx_matchpause","match_pause",AMXMD_ACCESS," - Pause the match")
-	register_concmd("amx_matchunpause","match_unpause",AMXMD_ACCESS," - Unpause the match")
+	register_concmd("amx_matchpause","match_pause",AMXMD_ACCESS," - Pausar el match")
+	register_concmd("amx_matchunpause","match_unpause",AMXMD_ACCESS," - Reanudar el match")
 
 	// TTT (port ReHLDS): hook por frame para congelar el reloj de ronda en pausa
 	register_forward(FM_StartFrame, "md_pause_frame")
 
 	// Swap teams
-	register_concmd("amx_swapteams","swap_teams_console",AMXMD_ACCESS," - Swap teams")
-	
+	register_concmd("amx_swapteams","swap_teams_console",AMXMD_ACCESS," - Cambiar de lado los equipos (swap)")
+
 	// Randomize teams
-	register_concmd("amx_randomizeteams","randomize_teams",AMXMD_ACCESS," - Randomize teams")
+	register_concmd("amx_randomizeteams","randomize_teams",AMXMD_ACCESS," - Armar equipos al azar")
 
 	// TTT (rcon-panel): mover un jugador de equipo / volcar equipos
 	register_concmd("amx_md_setteam","md_setteam_console",AMXMD_ACCESS,"<userid> <ct|t|spec>")
-	register_concmd("amx_md_teams","md_teams_console",AMXMD_ACCESS," - Dump team of each player (MDT|userid|team)")
+	register_concmd("amx_md_teams","md_teams_console",AMXMD_ACCESS," - Volcar el equipo de cada jugador (MDT|userid|team)")
+	register_concmd("amx_md_stats","md_stats_console",AMXMD_ACCESS," - Volcar las stats del match (MDS|T|ct|t y MDS|P|...)")
 
 	// Save current cvar config
-	register_concmd("amx_matchsave","save_settings_console",AMXMD_ACCESS," - Save your current match cvar config")
+	register_concmd("amx_matchsave","save_settings_console",AMXMD_ACCESS," - Guardar la config de cvars actual del match")
 	
 	// PUG style gameplay
 	register_concmd("amx_matchpug","match_pug",AMXMD_ACCESS,"<on|1|off|0>")
 
 #if defined(AMXMD_USE_HLTV)
-	register_concmd("amx_match_testhltv","hltv_test",AMXMD_ACCESS," - Test HLTV")
+	register_concmd("amx_match_testhltv","hltv_test",AMXMD_ACCESS," - Probar HLTV")
 #endif
 	
 	// Client commands
@@ -7610,11 +7747,11 @@ public plugin_init()
 	register_clcmd("say /unpause","match_unpause", AMXMD_ACCESS, "match_unpause")
 	
 	// Menu
-	register_concmd("amx_matchmenu", "menu_console", AMXMD_ACCESS, " - AMX Match Menu")
-	
+	register_concmd("amx_matchmenu", "menu_console", AMXMD_ACCESS, " - Menu de AMX Match")
+
 	// Server commands
-	register_concmd("amx_match_addlength", "menu_add_length", AMXMD_ACCESS, "<match length> [<match length> ...]")
-	register_concmd("amx_match_addconfig", "menu_add_config", AMXMD_ACCESS, "<config name> <config file>")
+	register_concmd("amx_match_addlength", "menu_add_length", AMXMD_ACCESS, "<largo de match> [<largo de match> ...]")
+	register_concmd("amx_match_addconfig", "menu_add_config", AMXMD_ACCESS, "<nombre de config> <archivo de config>")
 
 	register_srvcmd("amx_match_lmenu", "menu_add_length")
 	register_srvcmd("amx_match_cmenu", "menu_add_config")

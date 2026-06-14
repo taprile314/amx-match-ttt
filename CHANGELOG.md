@@ -5,6 +5,50 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Volcado de estadísticas para el panel rcon.** Nuevo comando admin `amx_md_stats` que escupe en
+  líneas parseables el marcador de rondas real del match (`MDS|T|<ct>|<t>`, sumando 1ª + 2ª mitad +
+  2-map + overtime) y, por jugador, `MDS|P|<userid>|<authid>|<kills>|<deaths>|<team>|<name>`
+  (kills = frags del marcador, muertes = `cs_get_user_deaths`). El `rcon-panel` lo consulta para
+  mostrar un contador de kills/muertes/rondas por partido **y** acumulado del torneo (persistido en
+  `stats.json`, cerrando cada match automáticamente al reiniciarse el marcador).
+- **Cartel "EL GANADOR ES &lt;equipo&gt;"** en la pantalla de fin de match. `md_all_to_spec()` arma el
+  HUD con el nombre del equipo ganador, capturado en el bloque de resolución del marcador (global
+  `g_winner_name`: `main_clanCT` / `main_clanT` según quién ganó, vacío = empate → muestra "EMPATE").
+
+### Fixed
+- **El freeze a espectador fallaba con presets de liga restrictivos.** Las configs `cal`/`calot`
+  traen `allow_spectators 0` (y `jul` trae `sv_maxspectators 1`), así que al terminar el match el
+  server rebotaba a los jugadores cuando `md_all_to_spec()` los mandaba a espectador. Ahora la función
+  fuerza `allow_spectators 1` + `sv_maxspectators 32` **antes** de mover a nadie, así el freeze
+  funciona sin importar con qué config se arrancó el match (los `.cfg` de liga se dejan con
+  `allow_spectators 0` a propósito: eso es correcto *durante* la partida, solo se abre al terminar).
+- **Pausa con la C4 plantada: el HUD ya no pierde el timer de la bomba.** `pause_hud` y el resync de
+  `match_unpause` mandaban siempre por `RoundTime` el tiempo de **ronda**, pisando el número de la C4
+  (que c4timer pone en ese mismo HUD) y sin devolverlo al reanudar. Nuevo helper `md_send_frozen_time()`:
+  si hay C4 plantada manda los segundos de la **bomba** (`g_pause_c4_left`), si no el tiempo de ronda.
+  Así el timer de la C4 queda congelado durante la pausa y vuelve solo al despausar, sincronizado con
+  la detonación real (que `md_pause_frame` ya pineaba).
+- **Pausa durante el freezetime: el período de compra ya no se vence durante la pausa.** El freeze de
+  inicio de ronda termina en tiempo real cuando `gametime >= m_fRoundStartTimeReal`, valor que
+  `md_pause_frame` no pineaba → al pausar en la compra, el freezetime se vencía y la ronda se iba a
+  LIVE por debajo. Ahora `match_pause` detecta `m_bFreezePeriod`, guarda los segundos restantes
+  (`g_pause_freeze_left`) y `md_pause_frame` re-pinea `m_fRoundStartTimeReal` cada frame, así el freeze
+  se congela y se reanuda con el tiempo que tenía.
+
+### Changed
+- **Ayuda de comandos de consola traducida al español.** Los textos del 4º argumento de
+  `register_concmd`/`register_clcmd` (los que muestra `amx_help` o un comando con argumentos mal)
+  pasaron de inglés a español (`Restart a match` → `Reiniciar un match`, `<Config filename>` →
+  `<archivo de config>`, etc.). No afecta el sistema `%L` ni el diccionario, que ya estaban completos.
+
+### Stack (fuera del plugin)
+- **c4timer** (`c4timer.amxx`, plugin de terceros de `assets/cs16/c4_timer.7z`) instalado en el stack
+  ReHLDS: muestra la cuenta de la C4 en el HUD del round timer al plantar. **Compatible con la pausa**
+  (usan mecanismos distintos: la pausa pinea la entidad real de la C4 por frame, c4timer solo manda
+  mensajes de display). El roce cosmético del HUD al pausar con la bomba plantada quedó resuelto con
+  `md_send_frozen_time()` (ver _Fixed_ arriba).
+
 ### Planned
 - Migración a **ReHLDS + ReGameDLL + ReAPI** (rama `rehlds-port`). Objetivo principal: **pausa real
   que congela también el tiempo de la partida**, no solo a los jugadores — imposible en el engine
