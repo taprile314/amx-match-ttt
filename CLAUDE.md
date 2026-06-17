@@ -15,14 +15,19 @@ fuera de este git). Detalle de qué se le cambió al original: `README.md`, `CHA
 No hay tests automatizados ni linter: es un plugin de juego, se verifica **in-game**.
 
 ```bat
-build.bat        REM compila scripting\amx_match_deluxe.sma -> plugins\amx_match_deluxe.amxx
-                 REM y copia el .amxx al server adyacente
+build_rehlds.bat REM compila .sma -> plugins\amx_match_deluxe.amxx (stack ReHLDS) y lo despliega
+                 REM al server RE. ESTE es el build vigente: el .sma usa #include <reapi>.
+build.bat        REM build legacy contra el stack STOCK (..\Counter-Strike 1.6-amx). YA NO compila
+                 REM el codigo actual (falta reapi.inc en ese stack). Solo sirve para la baseline v1.0.0.
 ```
 
-- El **compilador `amxxpc.exe` NO se versiona** acá: `build.bat` lo busca en
-  `..\Counter-Strike 1.6-amx\cstrike\addons\amxmodx\scripting` (variable `AMXX` arriba del `.bat`).
-  Esto asume que el repo está **dentro del stack USB, al lado de `Counter-Strike 1.6-amx/`**. Si el
-  AMX Mod X está en otra ruta, editar la variable `AMXX`.
+- **El build vigente es `build_rehlds.bat`.** Desde el port (v2.0.0, ahora `main`) el `.sma` usa
+  natives de ReAPI, así que requiere el `amxxpc.exe` + `reapi*.inc` del **stack RE**
+  (`..\cs1.6_RE-HDLS\...\scripting`). `build.bat` (stack stock) queda solo para compilar la baseline
+  `v1.0.0`; contra `main` falla por includes faltantes.
+- El **compilador `amxxpc.exe` NO se versiona** acá: cada `.bat` lo busca en el `scripting\` de su
+  stack adyacente (variable `AMXX` arriba del `.bat`). Esto asume que el repo está **dentro del stack
+  USB, al lado de la carpeta del server**. Si el AMX Mod X está en otra ruta, editar la variable `AMXX`.
 - El **`.amxx` compilado NO se versiona** (`plugins/*.amxx` está en `.gitignore`): es un artefacto de
   build. Se publica como **release asset** (ver "Releases" abajo). `plugins/.gitkeep` mantiene la carpeta.
 - Tras compilar, el plugin nuevo se carga recién al **`changelevel`** o reinicio del server (AMX Mod X
@@ -30,19 +35,19 @@ build.bat        REM compila scripting\amx_match_deluxe.sma -> plugins\amx_match
 
 ### Releases (publicar una versión)
 
-> ⚠️ **Todavía NO hay release estable `v1.0`.** El plugin (freeze-a-espectador, pausa, halftime sin
-> warmup, etc.) está en fase de ajuste y **falta prueba in-game exhaustiva** en el engine no-steam del
-> torneo. No cortar `v1.0` hasta que el mantenedor lo indique explícitamente — primero se terminan de
-> ajustar los detalles pendientes. `CHANGELOG.md` sigue en `[Unreleased]`.
+> ℹ️ **Releases publicadas:** `v1.0.0` (baseline sobre HLDS stock) y **`v2.0.0`** (port a
+> ReHLDS + ReGameDLL + ReAPI, ya es `main`). La migración ReHLDS — con pausa real que congela el
+> reloj — está **enviada**. `release.bat` apunta al stack RE (`..\cs1.6_RE-HDLS`) porque el `.sma`
+> usa `#include <reapi>`. Cortar una nueva versión solo cuando el mantenedor lo indique.
 
 ```bat
-release.bat v1.0.0
+release.bat v2.0.0
 ```
-Compila → arma un **bundle de deploy** (`dist/amx-match-ttt-vX.Y.Z.zip`, que espeja la estructura
-`addons/amxmodx/` para extraer sobre `cstrike/`) → crea un **GitHub Release** con ese zip adjunto vía
-el CLI `gh` (debe estar logueado). Requiere el commit pusheado (el tag se crea sobre HEAD). Actualizar
-`CHANGELOG.md` antes de cortar la versión. `INSTALL.txt` (incluido en el bundle) explica el deploy al
-usuario final.
+Compila (con el `amxxpc.exe` del stack RE) → arma un **bundle de deploy**
+(`dist/amx-match-ttt-vX.Y.Z.zip`, que espeja la estructura `addons/amxmodx/` para extraer sobre
+`cstrike/`) → crea un **GitHub Release** con ese zip adjunto vía el CLI `gh` (debe estar logueado).
+Requiere el commit pusheado (el tag se crea sobre HEAD). Actualizar `CHANGELOG.md` antes de cortar la
+versión. `INSTALL.txt` (incluido en el bundle) explica el deploy al usuario final.
 - Compilación válida = se genera el `.amxx` con `Done.` (hay warnings preexistentes de símbolos
   deprecados y unreachable code — son inofensivos, no romper por ellos).
 
