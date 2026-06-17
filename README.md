@@ -48,6 +48,12 @@ tools/release.bat                            compila + arma bundle .zip + public
 
 ## Instalar en un server de CS 1.6 + AMX Mod X
 
+> ⚠️ **Requisitos de runtime (v2.0.0):** servidor dedicado sobre **ReHLDS + ReGameDLL**, con
+> **Metamod + AMX Mod X 1.10** y los módulos **`reapi` (`reapi_amxx.dll`), `cstrike`, `fakemeta` y
+> `regex`** cargados. Desde v2.0.0 el plugin usa natives de ReAPI (`#include <reapi>`), por lo que
+> **NO carga en un HLDS stock** ni en un engine sin ReGameDLL/ReAPI. Para HLDS stock, usá la release
+> [`v1.0.0`](https://github.com/taprile314/amx-match-ttt/releases/tag/v1.0.0) (baseline sin ReAPI).
+
 Copiá cada archivo a su lugar dentro de `cstrike/`:
 
 | Del repo | Va en |

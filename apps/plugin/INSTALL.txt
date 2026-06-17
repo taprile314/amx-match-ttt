@@ -22,8 +22,13 @@ Este bundle replica la estructura de carpetas de cstrike/. Para instalar:
 
 5. Reinicia el mapa (changelevel) o el server.
 
-Requiere: Metamod + AMX Mod X 1.10 (con el modulo cstrike/fakemeta) sobre un
-Counter-Strike 1.6 dedicado (hlds).
+Requiere (v2.0.0): un servidor dedicado de Counter-Strike 1.6 sobre ReHLDS +
+ReGameDLL, con Metamod + AMX Mod X 1.10 y estos modulos AMXX cargados: reapi
+(reapi_amxx.dll), cstrike, fakemeta y regex.
+
+IMPORTANTE: desde v2.0.0 el plugin usa natives de ReAPI (#include <reapi>), asi
+que NO carga en un HLDS stock ni en un engine sin ReGameDLL/ReAPI. Si necesitas
+correr sobre HLDS stock, usa la release v1.0.0 (baseline sin ReAPI).
 
 Comandos y flujo del match: ver docs/GUIA_MATCH.md en el repo
 https://github.com/taprile314/amx-match-ttt
