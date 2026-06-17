@@ -6,6 +6,10 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Changed
+- **Docs: requisito de runtime ReHLDS explícito.** `INSTALL.txt` y la sección de instalación del
+  `README.md` ahora aclaran que v2.0.0 requiere **ReHLDS + ReGameDLL** con los módulos `reapi`,
+  `cstrike`, `fakemeta` y `regex` — el plugin usa natives de ReAPI y **no carga en HLDS stock**
+  (antes `INSTALL.txt` decía solo "hlds", lo cual era engañoso). Para HLDS stock, usar `v1.0.0`.
 - **Repo reestructurado como monorepo.** Los tres componentes pasaron a vivir bajo `apps/`
   (`apps/plugin/`, `apps/rcon-panel/`, `apps/motd-server/`) y el tooling de build/release a `tools/`.
   Se actualizaron todas las rutas relativas (`.bat` de `tools/`, `.gitignore`, docs) y las refs del
