@@ -20,26 +20,31 @@ Fork personalizado del plugin **AMX Mod X `amx_match_deluxe` 8.11** (originalmen
 | **FFA silencioso** | Sin el ruido de "FFA config loaded" / "Ejecutando config FFA" al terminar el match. |
 
 Detalle por commit en [`CHANGELOG.md`](CHANGELOG.md). Comparación completa original vs fork en
-[`docs/ORIGINAL-VS-FORK.md`](docs/ORIGINAL-VS-FORK.md).
+[`apps/plugin/docs/ORIGINAL-VS-FORK.md`](apps/plugin/docs/ORIGINAL-VS-FORK.md).
 
-## Estructura del repo
+## Estructura del repo (monorepo)
+
+Tres componentes bajo `apps/`, más el tooling de build/release en `tools/`:
 
 ```
-scripting/amx_match_deluxe.sma     ⭐ fuente del plugin (lo que se edita)
-plugins/amx_match_deluxe.amxx        compilado — NO versionado (release asset / build local)
-data/lang/amx_match_deluxe.txt       diccionario multi-idioma (incluye [es])
-configs/amxmd/amxmd.cfg              config principal del plugin
-configs/amxmd/leagues/*.cfg          configs de liga (cal, ecup, ffa, etc.)
-configs/sql.cfg                      conexión MySQL/MariaDB para stats
-configs/users.ini.example            admins (plantilla — sin credenciales reales)
-docs/GUIA_MATCH.md                   guía operativa de comandos y flujo
-build.bat                            compila el .sma y lo despliega al server adyacente
-release.bat                          compila + arma bundle .zip + publica GitHub Release
-rcon-panel/                          panel de control web (Node, rcon)
+apps/plugin/                                 ⭐ el plugin AMX Mod X (Pawn)
+  scripting/amx_match_deluxe.sma               fuente del plugin (lo que se edita)
+  plugins/amx_match_deluxe.amxx                compilado — NO versionado (release asset / build local)
+  data/lang/amx_match_deluxe.txt               diccionario multi-idioma (incluye [es])
+  configs/amxmd/amxmd.cfg                       config principal del plugin
+  configs/amxmd/leagues/*.cfg                   configs de liga (cal, ecup, ffa, etc.)
+  configs/sql.cfg                               conexión MySQL/MariaDB para stats
+  configs/users.ini.example                     admins (plantilla — sin credenciales reales)
+  docs/GUIA_MATCH.md                            guía operativa de comandos y flujo
+  INSTALL.txt                                   instrucciones de deploy (van en el bundle)
+apps/rcon-panel/                             panel de control web (Node, rcon)
+apps/motd-server/                            servidor HTTP del MOTD (PowerShell)
+tools/build_rehlds.bat                       compila el .sma (stack ReHLDS) y lo despliega al server
+tools/release.bat                            compila + arma bundle .zip + publica GitHub Release
 ```
 
 > El `.amxx` compilado **no se versiona** (está en `.gitignore`). Para deploy, bajá el bundle de la
-> última [Release](https://github.com/taprile314/amx-match-ttt/releases) o compilalo con `build.bat`.
+> última [Release](https://github.com/taprile314/amx-match-ttt/releases) o compilalo con `tools\build_rehlds.bat`.
 
 ## Instalar en un server de CS 1.6 + AMX Mod X
 
@@ -47,27 +52,28 @@ Copiá cada archivo a su lugar dentro de `cstrike/`:
 
 | Del repo | Va en |
 |---|---|
-| `scripting/amx_match_deluxe.sma` | `addons/amxmodx/scripting/` |
-| `plugins/amx_match_deluxe.amxx` | `addons/amxmodx/plugins/` |
-| `data/lang/amx_match_deluxe.txt` | `addons/amxmodx/data/lang/` |
-| `configs/amxmd/` | `addons/amxmodx/configs/amxmd/` |
-| `configs/sql.cfg` | `addons/amxmodx/configs/` |
-| `configs/users.ini.example` | `addons/amxmodx/configs/users.ini` (renombrar y completar) |
+| `apps/plugin/scripting/amx_match_deluxe.sma` | `addons/amxmodx/scripting/` |
+| `apps/plugin/plugins/amx_match_deluxe.amxx` | `addons/amxmodx/plugins/` |
+| `apps/plugin/data/lang/amx_match_deluxe.txt` | `addons/amxmodx/data/lang/` |
+| `apps/plugin/configs/amxmd/` | `addons/amxmodx/configs/amxmd/` |
+| `apps/plugin/configs/sql.cfg` | `addons/amxmodx/configs/` |
+| `apps/plugin/configs/users.ini.example` | `addons/amxmodx/configs/users.ini` (renombrar y completar) |
 
 Asegurate de que `addons/amxmodx/configs/plugins.ini` cargue `amx_match_deluxe.amxx`, y de tener
 `amx_language "es"` en `addons/amxmodx/configs/amxx.cfg` para que salga en español.
 
 ## Compilar
 
-Requiere el compilador `amxxpc.exe` de AMX Mod X (no se versiona acá). Si el repo está dentro del
-stack USB (al lado de `Counter-Strike 1.6-amx/`), simplemente:
+Requiere el compilador `amxxpc.exe` de AMX Mod X (no se versiona acá). El plugin usa
+`#include <reapi>`, así que se compila con el `amxxpc.exe` del **stack ReHLDS**. Si el repo está dentro
+del stack USB (al lado de `cs1.6_RE-HDLS/`), simplemente:
 
 ```bat
-build.bat
+tools\build_rehlds.bat
 ```
 
-Compila `scripting/amx_match_deluxe.sma` → `plugins/amx_match_deluxe.amxx` y lo copia al server.
-Si tu AMX Mod X está en otra ruta, editá la variable `AMXX` arriba del `.bat`.
+Compila `apps/plugin/scripting/amx_match_deluxe.sma` → `apps/plugin/plugins/amx_match_deluxe.amxx` y lo
+copia al server. Si tu AMX Mod X está en otra ruta, editá la variable `AMXX` arriba del `.bat`.
 
 ## Releases
 
@@ -75,17 +81,17 @@ El binario no se versiona; cada versión se publica como **GitHub Release** con 
 adjunto. Para cortar una versión (requiere `gh` logueado y el commit pusheado):
 
 ```bat
-release.bat v1.0.0
+tools\release.bat v2.0.0
 ```
 
-Compila, arma `dist/amx-match-ttt-v1.0.0.zip` (espeja `addons/amxmodx/` para extraer sobre `cstrike/`,
+Compila, arma `dist/amx-match-ttt-v2.0.0.zip` (espeja `addons/amxmodx/` para extraer sobre `cstrike/`,
 incluye `INSTALL.txt`) y crea el Release con ese zip como asset. Antes de cada release, actualizá
 `CHANGELOG.md`. Los usuarios bajan el bundle desde la
 [pestaña Releases](https://github.com/taprile314/amx-match-ttt/releases).
 
 ## Comandos
 
-Ver [`docs/GUIA_MATCH.md`](docs/GUIA_MATCH.md). Resumen de admin (flag `a`): `amx_match[2|3|4]`,
+Ver [`apps/plugin/docs/GUIA_MATCH.md`](apps/plugin/docs/GUIA_MATCH.md). Resumen de admin (flag `a`): `amx_match[2|3|4]`,
 `amx_matchmenu`, `amx_matchstart` / `/start`, `amx_matchstop` / `/stop`, `amx_matchrestart`,
 `amx_swapteams`, `amx_matchpause` / `/pause`, `amx_matchunpause` / `/unpause`. Jugadores:
 `ready` / `notready`, `/ct` `/t` (knife round).

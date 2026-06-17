@@ -3,8 +3,11 @@
 *.lst
 compiled/
 *.amxx.bak*
-plugins/*.amxx
+apps/plugin/plugins/*.amxx
 dist/
+
+# Bundles/zips sueltos (artefactos, no se versionan; el bundle de release va en dist/)
+*.zip
 
 # Backups
 *.bak
@@ -24,17 +27,17 @@ desktop.ini
 *.log
 
 # Credenciales reales (solo se versiona el .example)
-configs/users.ini
-rcon-panel/config.json
+apps/plugin/configs/users.ini
+apps/rcon-panel/config.json
 
 # Etiquetas de PC del panel (IP->nombre, especifico de cada lab)
-rcon-panel/pc-labels.json
+apps/rcon-panel/pc-labels.json
 
 # Contador de stats del panel (acumulado del torneo, datos de runtime)
-rcon-panel/stats.json
+apps/rcon-panel/stats.json
 
 # Equipos + fixture + tabla del torneo (datos de runtime, especifico de cada torneo)
-rcon-panel/tournament.json
+apps/rcon-panel/tournament.json
 
 # Node (por si en el futuro el panel usa dependencias)
 node_modules/
