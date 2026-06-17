@@ -106,3 +106,7 @@ Ver [`apps/plugin/docs/GUIA_MATCH.md`](apps/plugin/docs/GUIA_MATCH.md). Resumen 
 
 Trabajo derivado de `amx_match_deluxe` (Shromilder, Infra) y AMX Mod X, distribuido bajo **GPL**.
 Ver [`LICENSE`](LICENSE). Las modificaciones de este fork son para uso del torneo TTT 2026.
+
+> 🤖 **Nota:** todo este proyecto (las modificaciones del fork, el panel rcon, el servidor del MOTD,
+> el tooling de build/release y la documentación) fue **vibecodeado** — desarrollado con asistencia
+> de IA (Claude Code). Tenelo en cuenta al revisar o auditar el código.
