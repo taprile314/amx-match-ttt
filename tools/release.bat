@@ -6,8 +6,11 @@ REM  Release con ese bundle como asset, via el CLI `gh`.
 REM
 REM    Uso:   release.bat v1.0.0
 REM
-REM  Requisitos: amxxpc.exe del AMX Mod X del stack adyacente (igual que build.bat)
-REM              y `gh` logueado (gh auth status).
+REM  Requisitos: amxxpc.exe del AMX Mod X del stack RE adyacente (igual que
+REM              build_rehlds.bat) y `gh` logueado (gh auth status).
+REM
+REM  Este .bat vive en tools\: ..\.. llega al stack hermano RE, ..\apps\plugin al
+REM  codigo del plugin, y ..\dist (raiz del repo) al bundle de salida.
 REM ============================================================================
 setlocal
 cd /d "%~dp0"
@@ -15,13 +18,14 @@ cd /d "%~dp0"
 set "VER=%~1"
 if "%VER%"=="" (
   echo Uso: release.bat vX.Y.Z
-  echo   ej: release.bat v1.0.0
+  echo   ej: release.bat v2.0.0
   exit /b 1
 )
 
 REM Stack ReHLDS/ReAPI: el plugin usa #include <reapi>, asi que el compilador
 REM debe ser el del stack RE (cuyo include\ tiene los reapi*.inc), NO el stock.
-set "AMXX=..\cs1.6_RE-HDLS\cstrike\addons\amxmodx\scripting"
+set "AMXX=..\..\cs1.6_RE-HDLS\cstrike\addons\amxmodx\scripting"
+set "PLUGIN=..\apps\plugin"
 if not exist "%AMXX%\amxxpc.exe" (
   echo [ERROR] No encuentro amxxpc.exe en: %AMXX%
   echo Edita la variable AMXX en este .bat.
@@ -30,28 +34,28 @@ if not exist "%AMXX%\amxxpc.exe" (
 
 REM --- 1) Compilar ---------------------------------------------------------
 echo [1/3] Compilando amx_match_deluxe.sma ...
-"%AMXX%\amxxpc.exe" scripting\amx_match_deluxe.sma -oplugins\amx_match_deluxe.amxx -i"%AMXX%\include"
-if not exist "plugins\amx_match_deluxe.amxx" (
+"%AMXX%\amxxpc.exe" "%PLUGIN%\scripting\amx_match_deluxe.sma" -o"%PLUGIN%\plugins\amx_match_deluxe.amxx" -i"%AMXX%\include"
+if not exist "%PLUGIN%\plugins\amx_match_deluxe.amxx" (
   echo [ERROR] La compilacion fallo, no se genero el .amxx.
   exit /b 1
 )
 
 REM --- 2) Armar bundle de deploy (espeja la estructura de cstrike/) ---------
-echo [2/3] Armando bundle dist\amx-match-ttt-%VER%.zip ...
-set "STAGE=dist\amx-match-ttt-%VER%"
-if exist "dist" rmdir /s /q "dist"
+echo [2/3] Armando bundle ..\dist\amx-match-ttt-%VER%.zip ...
+set "STAGE=..\dist\amx-match-ttt-%VER%"
+if exist "..\dist" rmdir /s /q "..\dist"
 mkdir "%STAGE%\addons\amxmodx\plugins"        2>nul
 mkdir "%STAGE%\addons\amxmodx\data\lang"      2>nul
 mkdir "%STAGE%\addons\amxmodx\configs"        2>nul
 
-copy /Y "plugins\amx_match_deluxe.amxx"   "%STAGE%\addons\amxmodx\plugins\"        >nul
-copy /Y "data\lang\amx_match_deluxe.txt"  "%STAGE%\addons\amxmodx\data\lang\"      >nul
-xcopy /E /I /Y "configs\amxmd"            "%STAGE%\addons\amxmodx\configs\amxmd"   >nul
-copy /Y "configs\sql.cfg"                 "%STAGE%\addons\amxmodx\configs\"        >nul
-copy /Y "configs\users.ini.example"       "%STAGE%\addons\amxmodx\configs\"        >nul
-copy /Y "INSTALL.txt"                     "%STAGE%\"                               >nul
+copy /Y "%PLUGIN%\plugins\amx_match_deluxe.amxx"   "%STAGE%\addons\amxmodx\plugins\"        >nul
+copy /Y "%PLUGIN%\data\lang\amx_match_deluxe.txt"  "%STAGE%\addons\amxmodx\data\lang\"      >nul
+xcopy /E /I /Y "%PLUGIN%\configs\amxmd"            "%STAGE%\addons\amxmodx\configs\amxmd"   >nul
+copy /Y "%PLUGIN%\configs\sql.cfg"                 "%STAGE%\addons\amxmodx\configs\"        >nul
+copy /Y "%PLUGIN%\configs\users.ini.example"       "%STAGE%\addons\amxmodx\configs\"        >nul
+copy /Y "%PLUGIN%\INSTALL.txt"                     "%STAGE%\"                               >nul
 
-set "ZIP=dist\amx-match-ttt-%VER%.zip"
+set "ZIP=..\dist\amx-match-ttt-%VER%.zip"
 powershell -NoProfile -Command "Compress-Archive -Path '%STAGE%\*' -DestinationPath '%ZIP%' -Force"
 if not exist "%ZIP%" (
   echo [ERROR] No se pudo crear el zip.

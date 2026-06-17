@@ -8,28 +8,48 @@ Fork personalizado del plugin **AMX Mod X `amx_match_deluxe` 8.11** (Pawn) para 
 usado en el torneo LAN **"TTT 2026"**. Contiene **solo el plugin + sus configs + el panel rcon** — NO
 el stack completo (los game binaries de CS, MariaDB y TeamSpeak viven en el repo padre `sv_cs_ttt/`,
 fuera de este git). Detalle de qué se le cambió al original: `README.md`, `CHANGELOG.md` y
-`docs/ORIGINAL-VS-FORK.md`.
+`apps/plugin/docs/ORIGINAL-VS-FORK.md`.
+
+## Estructura del repo (monorepo)
+
+Tres componentes independientes bajo `apps/`, más el tooling de build/release en `tools/`:
+
+```
+apps/
+  plugin/        El plugin AMX Mod X (Pawn). scripting/ configs/ data/ docs/
+                 plugins/ (artefacto compilado, gitignored) e INSTALL.txt.
+  rcon-panel/    Panel de control web (Node, cero dependencias).
+  motd-server/   Servidor HTTP estatico del MOTD (PowerShell/TcpListener).
+tools/           build_rehlds.bat (build vigente) y release.bat.
+```
+
+**Portabilidad (regla a NO romper):** todo es relativo a `%~dp0`/`$PSScriptRoot`, nunca con letra de
+unidad. Las refs internas de cada `apps/<componente>` son relativas a su propia carpeta, así que cada
+componente se mueve como unidad sin romperse. Los `.bat` de `tools/` están un nivel más adentro: usan
+`..\..` para llegar al stack hermano (`cs1.6_RE-HDLS`) y `..\apps\plugin` para el código del plugin.
 
 ## Build / deploy
 
 No hay tests automatizados ni linter: es un plugin de juego, se verifica **in-game**.
 
 ```bat
-build_rehlds.bat REM compila .sma -> plugins\amx_match_deluxe.amxx (stack ReHLDS) y lo despliega
-                 REM al server RE. ESTE es el build vigente: el .sma usa #include <reapi>.
-build.bat        REM build legacy contra el stack STOCK (..\Counter-Strike 1.6-amx). YA NO compila
-                 REM el codigo actual (falta reapi.inc en ese stack). Solo sirve para la baseline v1.0.0.
+tools\build_rehlds.bat REM compila apps\plugin\scripting\amx_match_deluxe.sma ->
+                       REM apps\plugin\plugins\amx_match_deluxe.amxx (stack ReHLDS) y lo despliega
+                       REM al server RE. ESTE es el build vigente: el .sma usa #include <reapi>.
 ```
 
-- **El build vigente es `build_rehlds.bat`.** Desde el port (v2.0.0, ahora `main`) el `.sma` usa
+- **El build vigente es `tools\build_rehlds.bat`.** Desde el port (v2.0.0, ahora `main`) el `.sma` usa
   natives de ReAPI, así que requiere el `amxxpc.exe` + `reapi*.inc` del **stack RE**
-  (`..\cs1.6_RE-HDLS\...\scripting`). `build.bat` (stack stock) queda solo para compilar la baseline
-  `v1.0.0`; contra `main` falla por includes faltantes.
-- El **compilador `amxxpc.exe` NO se versiona** acá: cada `.bat` lo busca en el `scripting\` de su
-  stack adyacente (variable `AMXX` arriba del `.bat`). Esto asume que el repo está **dentro del stack
-  USB, al lado de la carpeta del server**. Si el AMX Mod X está en otra ruta, editar la variable `AMXX`.
-- El **`.amxx` compilado NO se versiona** (`plugins/*.amxx` está en `.gitignore`): es un artefacto de
-  build. Se publica como **release asset** (ver "Releases" abajo). `plugins/.gitkeep` mantiene la carpeta.
+  (`..\..\cs1.6_RE-HDLS\...\scripting`). (El build legacy contra el stack stock `Counter-Strike 1.6-amx`
+  se eliminó: ya no compilaba `main` por falta de `reapi.inc`. Para recompilar la baseline `v1.0.0`,
+  está en el tag `v1.0.0`.)
+- El **compilador `amxxpc.exe` NO se versiona** acá: el `.bat` lo busca en el `scripting\` del stack RE
+  adyacente (variable `AMXX` arriba del `.bat`, `..\..\cs1.6_RE-HDLS\...`). Esto asume que el repo está
+  **dentro del stack USB, al lado de la carpeta del server**. Si el AMX Mod X está en otra ruta, editar
+  la variable `AMXX`.
+- El **`.amxx` compilado NO se versiona** (`apps/plugin/plugins/*.amxx` está en `.gitignore`): es un
+  artefacto de build. Se publica como **release asset** (ver "Releases" abajo). `apps/plugin/plugins/.gitkeep`
+  mantiene la carpeta.
 - Tras compilar, el plugin nuevo se carga recién al **`changelevel`** o reinicio del server (AMX Mod X
   lee los `.amxx` al cargar el mapa).
 
@@ -37,25 +57,26 @@ build.bat        REM build legacy contra el stack STOCK (..\Counter-Strike 1.6-a
 
 > ℹ️ **Releases publicadas:** `v1.0.0` (baseline sobre HLDS stock) y **`v2.0.0`** (port a
 > ReHLDS + ReGameDLL + ReAPI, ya es `main`). La migración ReHLDS — con pausa real que congela el
-> reloj — está **enviada**. `release.bat` apunta al stack RE (`..\cs1.6_RE-HDLS`) porque el `.sma`
+> reloj — está **enviada**. `release.bat` apunta al stack RE (`..\..\cs1.6_RE-HDLS`) porque el `.sma`
 > usa `#include <reapi>`. Cortar una nueva versión solo cuando el mantenedor lo indique.
 
 ```bat
-release.bat v2.0.0
+tools\release.bat v2.0.0
 ```
-Compila (con el `amxxpc.exe` del stack RE) → arma un **bundle de deploy**
-(`dist/amx-match-ttt-vX.Y.Z.zip`, que espeja la estructura `addons/amxmodx/` para extraer sobre
-`cstrike/`) → crea un **GitHub Release** con ese zip adjunto vía el CLI `gh` (debe estar logueado).
-Requiere el commit pusheado (el tag se crea sobre HEAD). Actualizar `CHANGELOG.md` antes de cortar la
-versión. `INSTALL.txt` (incluido en el bundle) explica el deploy al usuario final.
+Compila (con el `amxxpc.exe` del stack RE) → arma un **bundle de deploy** (`dist/amx-match-ttt-vX.Y.Z.zip`
+en la raíz del repo, que espeja la estructura `addons/amxmodx/` para extraer sobre `cstrike/`) → crea un
+**GitHub Release** con ese zip adjunto vía el CLI `gh` (debe estar logueado). Requiere el commit pusheado
+(el tag se crea sobre HEAD). Actualizar `CHANGELOG.md` antes de cortar la versión. `INSTALL.txt`
+(en `apps/plugin/`, incluido en el bundle) explica el deploy al usuario final.
 - Compilación válida = se genera el `.amxx` con `Done.` (hay warnings preexistentes de símbolos
   deprecados y unreachable code — son inofensivos, no romper por ellos).
 
-El flujo de trabajo es: editar `scripting/amx_match_deluxe.sma` → `build.bat` → `changelevel` → probar.
+El flujo de trabajo es: editar `apps/plugin/scripting/amx_match_deluxe.sma` → `tools\build_rehlds.bat`
+→ `changelevel` → probar.
 
 ## Arquitectura del plugin — lo que NO es obvio leyendo un solo archivo
 
-Todo el plugin es **un único `.sma` de ~7600 líneas** (`scripting/amx_match_deluxe.sma`). Las
+Todo el plugin es **un único `.sma` de ~7600 líneas** (`apps/plugin/scripting/amx_match_deluxe.sma`). Las
 modificaciones del fork (vs el 8.11 original) son puntuales y conviene conocerlas antes de tocar:
 
 - **Cambio de equipo crash-safe (`md_set_team`, línea ~335).** La native `cs_set_user_team` de AMX
@@ -81,26 +102,28 @@ modificaciones del fork (vs el 8.11 original) son puntuales y conviene conocerla
 ## Idiomas / traducción
 
 Los textos in-game NO están hardcodeados: el `.sma` usa `%L ... "CLAVE"` y las claves se resuelven en
-**`data/lang/amx_match_deluxe.txt`** (diccionario multi-idioma). **Traducir o editar textos no requiere
+**`apps/plugin/data/lang/amx_match_deluxe.txt`** (diccionario multi-idioma). **Traducir o editar textos no requiere
 recompilar** — se edita el `.txt` (lado derecho del `=`, la CLAVE no se toca) y se recarga el mapa. El
 fork agregó la sección **`[es]`** (199 claves, sin acentos por compatibilidad de fuente del cliente). El
 idioma activo lo decide el cvar `amx_language` en el server.
 
-## Configs (se despliegan dentro de `cstrike/addons/amxmodx/`)
+## Configs (en `apps/plugin/configs/`, se despliegan dentro de `cstrike/addons/amxmodx/`)
 
-- `configs/amxmd/amxmd.cfg` — config principal del plugin (cvars `amx_match_*`).
-- `configs/amxmd/leagues/*.cfg` — presets de liga que fijan reglas de juego (`cal`, `ecup`, `calot`,
-  `ffa`, etc.). Se pasan como argumento `<config>` al iniciar un match.
-- `configs/sql.cfg` — conexión MySQL/MariaDB para stats (host/user/pass/db).
-- `configs/users.ini.example` — plantilla de admins. **Las credenciales reales (`configs/users.ini`)
-  están en `.gitignore`**; solo se versiona el `.example`. Misma política para `rcon-panel/config.json`.
+- `apps/plugin/configs/amxmd/amxmd.cfg` — config principal del plugin (cvars `amx_match_*`).
+- `apps/plugin/configs/amxmd/leagues/*.cfg` — presets de liga que fijan reglas de juego (`cal`, `ecup`,
+  `calot`, `ffa`, etc.). Se pasan como argumento `<config>` al iniciar un match.
+- `apps/plugin/configs/sql.cfg` — conexión MySQL/MariaDB para stats (host/user/pass/db).
+- `apps/plugin/configs/users.ini.example` — plantilla de admins. **Las credenciales reales
+  (`apps/plugin/configs/users.ini`) están en `.gitignore`**; solo se versiona el `.example`. Misma
+  política para `apps/rcon-panel/config.json`.
 
-## rcon-panel/ — panel de control web
+## apps/rcon-panel/ — panel de control web
 
 Herramienta aparte (no es parte del plugin): panel web en **Node con cero dependencias** (módulos
 nativos `http` + `dgram`) para controlar el server por rcon.
 
-- `node server.js` o `start_panel.bat` (portable, `%~dp0`). Sirve `public/index.html` + API rcon.
+- `node server.js` o `start_panel.bat` desde `apps/rcon-panel/` (portable, `%~dp0`). Sirve
+  `public/index.html` + API rcon.
 - **El rcon de GoldSrc es por UDP** (a diferencia de Source que es TCP): handshake challenge → comando.
   La `rconPassword` vive solo en el backend (`config.json`), nunca llega al navegador.
 - **`config.json` está en `.gitignore`** (tiene passwords). Copiar `config.example.json` → `config.json`
@@ -109,7 +132,7 @@ nativos `http` + `dgram`) para controlar el server por rcon.
 
 ## Comandos in-game (admin = flag `a`)
 
-Referencia completa en `docs/GUIA_MATCH.md`. Resumen: `amx_match[2|3|4]` (iniciar; `mrXX`=rounds por
+Referencia completa en `apps/plugin/docs/GUIA_MATCH.md`. Resumen: `amx_match[2|3|4]` (iniciar; `mrXX`=rounds por
 mitad, `tlXX`=minutos), `amx_matchmenu`, `amx_matchstart`/`/start`, `amx_matchstop`/`/stop`,
 `amx_matchrestart`, `amx_swapteams`, `amx_matchpause`/`/pause`, `amx_matchunpause`/`/unpause`.
 Jugadores: `ready`/`notready`, `/ct` `/t` (si hay knife round).

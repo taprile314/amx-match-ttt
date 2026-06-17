@@ -3,6 +3,20 @@
 Cambios de este fork respecto del `amx_match_deluxe` 8.11 original.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Changed
+- **Repo reestructurado como monorepo.** Los tres componentes pasaron a vivir bajo `apps/`
+  (`apps/plugin/`, `apps/rcon-panel/`, `apps/motd-server/`) y el tooling de build/release a `tools/`.
+  Se actualizaron todas las rutas relativas (`.bat` de `tools/`, `.gitignore`, docs) y las refs del
+  orquestador `start_servidor_ttt.bat` del stack padre. Portabilidad USB intacta (sin rutas con letra
+  de unidad; los `.bat` de `tools/` resuelven el stack hermano con `..\..`).
+
+### Removed
+- **`build.bat` (build legacy contra el stack stock).** Ya no compilaba `main` (el `.sma` usa
+  `#include <reapi>`, ausente en el stack stock); el build vigente es `tools/build_rehlds.bat`. Para
+  recompilar la baseline, está el tag `v1.0.0`.
+
 ## [2.0.0] - 2026-06-17
 
 Segunda release mayor: el fork migró de HLDS stock a **ReHLDS + ReGameDLL + ReAPI**. Esto habilita el
