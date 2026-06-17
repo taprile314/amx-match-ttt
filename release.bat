@@ -19,7 +19,9 @@ if "%VER%"=="" (
   exit /b 1
 )
 
-set "AMXX=..\Counter-Strike 1.6-amx\cstrike\addons\amxmodx\scripting"
+REM Stack ReHLDS/ReAPI: el plugin usa #include <reapi>, asi que el compilador
+REM debe ser el del stack RE (cuyo include\ tiene los reapi*.inc), NO el stock.
+set "AMXX=..\cs1.6_RE-HDLS\cstrike\addons\amxmodx\scripting"
 if not exist "%AMXX%\amxxpc.exe" (
   echo [ERROR] No encuentro amxxpc.exe en: %AMXX%
   echo Edita la variable AMXX en este .bat.
