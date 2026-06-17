@@ -27,5 +27,14 @@ desktop.ini
 configs/users.ini
 rcon-panel/config.json
 
+# Etiquetas de PC del panel (IP->nombre, especifico de cada lab)
+rcon-panel/pc-labels.json
+
+# Contador de stats del panel (acumulado del torneo, datos de runtime)
+rcon-panel/stats.json
+
+# Equipos + fixture + tabla del torneo (datos de runtime, especifico de cada torneo)
+rcon-panel/tournament.json
+
 # Node (por si en el futuro el panel usa dependencias)
 node_modules/

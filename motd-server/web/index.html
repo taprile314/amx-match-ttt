@@ -29,12 +29,16 @@
   /* Body en dos columnas */
   .body{width:100%;table-layout:fixed}
   .body > tbody > tr > td{vertical-align:top}
-  .colL{width:54%;padding-right:8px}
-  .colR{width:46%;padding-left:8px}
-  .card{background:rgba(33,64,154,.20);border:1px solid #2C459C;border-radius:7px;padding:9px 11px}
+  .colL{width:58%;padding-right:8px}
+  .colR{width:42%;padding-left:8px}
+  .card{background:rgba(33,64,154,.20);border:1px solid #2C459C;border-radius:7px;padding:9px 11px;margin-bottom:9px}
+  .card:last-child{margin-bottom:0}
   h2{margin:0 0 5px;font-size:11px;letter-spacing:2px;color:#E9A33C;text-transform:uppercase;border-left:3px solid #E9A33C;padding-left:7px}
-  ul{margin:0;padding:0 0 0 17px}
-  li{font-size:12px;line-height:1.5;color:#D7E0F5}
+  .phase{font-size:11px;font-weight:bold;color:#FFFFFF;letter-spacing:1px;margin:0 0 1px}
+  ul{margin:0 0 7px;padding:0 0 0 17px}
+  ul:last-child{margin-bottom:0}
+  li{font-size:12px;line-height:1.45;color:#D7E0F5}
+  li b{color:#FFFFFF}
   .lbl{font-size:9px;letter-spacing:2px;color:#7E8DB8;text-transform:uppercase}
   .big{font-size:15px;font-weight:bold;color:#FFFFFF;margin:2px 0 7px}
   .muted{font-size:11px;color:#C9D6F2}
@@ -62,10 +66,22 @@
       <td class="colL">
         <div class="card">
           <h2>Reglas</h2>
+          <div class="phase">Fase de grupos</div>
           <ul>
-            <li>[EDITAR: formato MR12]</li>
-            <li>[EDITAR: mapas]</li>
-            <li>El admin decide.</li>
+            <li>Gana el que llega a <b>11 rounds</b>.</li>
+            <li>Empate: se define por <b>puntaje de los equipos</b>.</li>
+          </ul>
+          <div class="phase">Semifinal y final</div>
+          <ul>
+            <li>Gana el que llega a <b>13 rounds</b>.</li>
+            <li>Empate: se define por <b>ronda de cuchillos</b>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h2>Pausas</h2>
+          <ul>
+            <li><b>3 pausas</b> de <b>30 seg</b> por equipo y por partida.</li>
+            <li>Solo se piden <b>entre rondas</b>.</li>
           </ul>
         </div>
       </td>

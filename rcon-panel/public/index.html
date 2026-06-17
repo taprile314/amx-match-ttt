@@ -173,9 +173,10 @@
         <button type="button" id="refresh-btn" style="flex:0 0 auto">↻ Actualizar</button>
       </div>
       <p id="status-summary" class="hint" aria-live="polite"><small class="hint">—</small></p>
+      <div id="group-bar" class="btns hidden" style="margin-bottom:12px;align-items:center"></div>
       <div id="players-region" aria-live="polite">
         <table id="players-table">
-          <thead><tr><th>#</th><th>Jugador</th><th>Equipo</th><th>Mover a</th><th class="num">Frags</th><th class="num">Ping</th><th></th></tr></thead>
+          <thead><tr><th>#</th><th>PC</th><th>Jugador</th><th>Equipo</th><th>Mover a</th><th class="num">Frags</th><th class="num">Ping</th><th></th></tr></thead>
           <tbody id="players-body"></tbody>
         </table>
         <p id="players-empty" class="empty hidden">No hay jugadores conectados.</p>
@@ -195,11 +196,11 @@
           <div class="field" style="flex:0 0 90px"><label for="fmt-type">Formato</label>
             <select id="fmt-type"><option value="mr">mr</option><option value="tl">tl</option></select>
           </div>
-          <div class="field" style="flex:0 0 90px"><label for="fmt-num">Rounds/min</label><input id="fmt-num" type="number" min="1" max="30" value="15"></div>
+          <div class="field" style="flex:0 0 90px"><label for="fmt-num">Rounds/min</label><input id="fmt-num" type="number" min="1" max="30" value="10"></div>
           <div class="field"><label for="cfg">Config</label><select id="cfg"></select></div>
         </div>
         <label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="rec" style="width:auto"> Grabar demo (recdemo)</label>
-        <p><small class="hint">Sin tags usa <code>amx_match2</code>. Con tags, <code>amx_match</code>.</small></p>
+        <p><small class="hint">Sin tags usa <code>amx_match2</code>. Con tags, <code>amx_match</code>. <b>Rounds = por mitad</b>; el match corta al ganar rounds+1 (10→11, 12→13, 15→16). Para el torneo usá mejor <b>Armar match</b> (setea el formato por fase).</small></p>
         <button class="primary" type="submit" style="width:100%">▶ Iniciar match</button>
       </form>
     </section>
@@ -212,18 +213,24 @@
         <p class="subhead">Partida</p>
         <div class="btns">
           <button type="button" data-rcon="amx_matchstart">▶ Forzar inicio (/start)</button>
-          <button type="button" data-rcon="amx_matchpause">⏸ Pausar</button>
-          <button type="button" data-rcon="amx_matchunpause">▶ Despausar</button>
           <button type="button" class="danger" data-confirm="¿Frenar/cancelar el match?" data-rcon="amx_matchstop">⏹ Detener (/stop)</button>
+          <button type="button" class="danger" data-confirm="¿Reiniciar el match desde cero?" data-rcon="amx_matchrestart">↻ Reiniciar match</button>
         </div>
       </div>
 
       <div class="group">
-        <p class="subhead">Reiniciar</p>
+        <p class="subhead">Pausa</p>
+        <div class="btns">
+          <button type="button" data-rcon="amx_matchpause">⏸ Pausar</button>
+          <button type="button" data-rcon="amx_matchunpause">▶ Despausar</button>
+        </div>
+      </div>
+
+      <div class="group">
+        <p class="subhead">Reiniciar ronda / mitad</p>
         <div class="btns">
           <button type="button" data-rcon="sv_restart 1">↻ Ronda</button>
           <button type="button" data-rcon="amx_matchrelo3">↻ Mitad</button>
-          <button type="button" class="danger" data-confirm="¿Reiniciar el match desde cero?" data-rcon="amx_matchrestart">↻ Match</button>
         </div>
       </div>
 
@@ -252,6 +259,127 @@
       </form>
     </section>
 
+    <!-- ESTADISTICAS -->
+    <section class="card wide" aria-labelledby="h-stats">
+      <div class="row" style="align-items:center;margin-bottom:8px">
+        <h2 id="h-stats" style="margin:0;flex:1">Estadísticas</h2>
+        <div class="btns" style="flex:0 0 auto;align-items:center">
+          <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="radio" name="stats-view" value="match" style="width:auto" checked> Partido</label>
+          <label style="display:flex;align-items:center;gap:6px;margin:0"><input type="radio" name="stats-view" value="tournament" style="width:auto"> Acumulado</label>
+          <button type="button" id="stats-reset" class="danger">Resetear acumulado</button>
+        </div>
+      </div>
+      <div id="stats-score" style="text-align:center;font-weight:800;font-size:22px;letter-spacing:.5px;margin:6px 0 14px"></div>
+      <table>
+        <thead><tr><th>Jugador</th><th>Equipo</th><th class="num">Kills</th><th class="num">Muertes</th><th class="num">K/D</th></tr></thead>
+        <tbody id="stats-body"></tbody>
+      </table>
+      <p id="stats-empty" class="empty hidden">Sin datos todavía. (Requiere el plugin con <code>amx_md_stats</code> cargado en el server.)</p>
+      <p><small class="hint">Rondas = score real del plugin (1ª + 2ª mitad + overtime). Kills = frags del marcador; muertes del engine. El <b>Acumulado</b> suma los matches cerrados + el partido en curso y persiste en <code>stats.json</code>; se cierra un match automáticamente cuando el plugin reinicia el marcador.</small></p>
+    </section>
+
+    <!-- TORNEO: EQUIPOS + ARMAR MATCH -->
+    <section class="card wide" aria-labelledby="h-teams">
+      <h2 id="h-teams">Torneo — Equipos y armado de match</h2>
+      <div class="row" style="gap:22px;align-items:flex-start">
+        <!-- columna: equipos -->
+        <div style="flex:1;min-width:280px">
+          <p class="subhead">Equipos</p>
+          <form id="team-form" class="row" style="align-items:flex-end;margin-bottom:10px">
+            <div class="field" style="margin:0;flex:2"><label for="team-name">Nombre</label><input id="team-name" maxlength="32" placeholder="Los Tigres" autocomplete="off"></div>
+            <div class="field" style="margin:0;flex:0 0 90px"><label for="team-tag">Tag</label><input id="team-tag" maxlength="15" placeholder="TIG" autocomplete="off"></div>
+            <button class="primary" type="submit" style="flex:0 0 auto">+ Agregar</button>
+          </form>
+          <table>
+            <thead><tr><th>Equipo</th><th>Tag</th><th></th></tr></thead>
+            <tbody id="teams-body"></tbody>
+          </table>
+          <p id="teams-empty" class="empty hidden">Sin equipos. Agregá los 6 del torneo.</p>
+          <p><small class="hint">El <b>tag</b> (corto) es el clantag que se ve en el scoreboard in-game. Si lo dejás vacío se usa el nombre.</small></p>
+        </div>
+        <!-- columna: armar match -->
+        <div style="flex:1;min-width:280px">
+          <p class="subhead">Armar match</p>
+          <form id="tmatch-form">
+            <div class="row">
+              <div class="field"><label for="tm-a">Equipo A</label><select id="tm-a"></select></div>
+              <div class="field" style="flex:0 0 64px"><label for="tm-side">Lado A</label>
+                <select id="tm-side"><option value="ct">CT</option><option value="t">TT</option></select>
+              </div>
+              <div class="field"><label for="tm-b">Equipo B</label><select id="tm-b"></select></div>
+            </div>
+            <div class="row">
+              <div class="field"><label for="tm-phase">Fase</label>
+                <select id="tm-phase"><option value="group">Grupos</option><option value="semi">Semifinal</option><option value="final">Final</option></select>
+              </div>
+              <div class="field" style="flex:0 0 110px"><label for="tm-fmt">Formato</label><input id="tm-fmt" maxlength="6" value="mr10"></div>
+              <div class="field"><label for="tm-cfg">Config</label><select id="tm-cfg"></select></div>
+            </div>
+            <label style="display:flex;align-items:center;gap:7px"><input type="checkbox" id="tm-rec" style="width:auto"> Grabar demo</label>
+            <div class="btns" style="margin-top:10px">
+              <button class="primary" type="submit" style="flex:1">▶ Crear y arrancar</button>
+              <button type="button" id="tm-create-only" style="flex:0 0 auto">Solo crear</button>
+            </div>
+            <p><small class="hint">Grupos = <b>mr10</b> · semis/final = <b>mr12</b> (se autocompleta al elegir la fase; editable). "Crear y arrancar" corre <code>amx_match</code> con los tags como equipos y empuja el <b>overtime por fase</b>: grupos sin desempate (empate → puntaje), semis/final con knife round.</small></p>
+          </form>
+        </div>
+      </div>
+    </section>
+
+    <!-- TORNEO: FIXTURE + TABLA -->
+    <section class="card wide" aria-labelledby="h-fixture">
+      <div class="row" style="align-items:center;margin-bottom:12px">
+        <h2 id="h-fixture" style="margin:0;flex:1">Torneo — Fixture y tabla de posiciones</h2>
+        <button type="button" id="tourney-refresh" style="flex:0 0 auto">↻ Actualizar</button>
+      </div>
+      <div class="row" style="gap:22px;align-items:flex-start">
+        <div style="flex:1.4;min-width:320px">
+          <p class="subhead">Matches</p>
+          <table>
+            <thead><tr><th>Fase</th><th>Partido</th><th class="num">Marcador</th><th>Estado</th><th></th></tr></thead>
+            <tbody id="matches-body"></tbody>
+          </table>
+          <p id="matches-empty" class="empty hidden">Sin matches todavía. Armá uno arriba.</p>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <p class="subhead">Tabla de posiciones (grupos)</p>
+          <table>
+            <thead><tr><th>#</th><th>Equipo</th><th class="num" title="Jugados">PJ</th><th class="num" title="Ganados">G</th><th class="num" title="Empatados">E</th><th class="num" title="Perdidos">P</th><th class="num" title="Rondas a favor / en contra">RF:RA</th><th class="num" title="Diferencia">Dif</th><th class="num" title="Puntos">Pts</th></tr></thead>
+            <tbody id="standings-body"></tbody>
+          </table>
+          <p id="standings-empty" class="empty hidden">Sin equipos.</p>
+          <p><small class="hint">Solo cuenta matches de <b>grupos</b> cerrados. Pts: victoria 3, empate 1. Desempate: Pts › Dif › RF (criterios definitivos a confirmar).</small></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- BANS -->
+    <section class="card wide" aria-labelledby="h-bans">
+      <div class="row" style="align-items:center;margin-bottom:12px">
+        <h2 id="h-bans" style="margin:0;flex:1">Bans activos</h2>
+        <button type="button" id="bans-refresh" style="flex:0 0 auto">↻ Actualizar</button>
+      </div>
+      <div class="row" style="gap:22px;align-items:flex-start">
+        <div style="flex:1;min-width:240px">
+          <p class="subhead">Por IP</p>
+          <table>
+            <thead><tr><th>IP</th><th>Duración</th><th></th></tr></thead>
+            <tbody id="bans-ip-body"></tbody>
+          </table>
+          <p id="bans-ip-empty" class="empty hidden">Sin IPs baneadas.</p>
+        </div>
+        <div style="flex:1;min-width:240px">
+          <p class="subhead">Por Steam / Unique ID</p>
+          <table>
+            <thead><tr><th>ID</th><th>Duración</th><th></th></tr></thead>
+            <tbody id="bans-id-body"></tbody>
+          </table>
+          <p id="bans-id-empty" class="empty hidden">Sin IDs baneados.</p>
+        </div>
+      </div>
+      <p><small class="hint">Para banear, usá el botón <b>Ban</b> en la tabla de jugadores. En LAN no-steam varios clientes comparten el mismo Unique ID (STEAM_ID_LAN / HLTV), por eso el <b>ban por IP</b> es más confiable. Los bans se graban en el server (<code>writeip</code> / <code>writeid</code>) y sobreviven al reinicio.</small></p>
+    </section>
+
     <!-- CONSOLA -->
     <section class="card" aria-labelledby="h-con">
       <h2 id="h-con">Consola rcon</h2>
@@ -273,6 +401,67 @@
     <div class="btns" style="justify-content:flex-end">
       <button value="cancel">Cancelar</button>
       <button value="ok" class="danger">Confirmar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialogo de ban -->
+<dialog id="ban-dialog">
+  <form id="ban-form">
+    <h2 style="margin-top:0">Banear jugador</h2>
+    <p id="ban-player" class="hint" style="margin:0 0 14px;color:var(--text)"></p>
+    <div class="field">
+      <label>Método</label>
+      <label style="display:flex;align-items:center;gap:7px;color:var(--text);margin-bottom:4px"><input type="radio" name="ban-type" value="ip" style="width:auto"> Por IP <small class="hint">(recomendado en LAN)</small></label>
+      <label style="display:flex;align-items:center;gap:7px;color:var(--text)"><input type="radio" name="ban-type" value="id" style="width:auto"> Por Steam / Unique ID</label>
+    </div>
+    <div class="field">
+      <label for="ban-minutes">Duración</label>
+      <select id="ban-minutes">
+        <option value="0">Permanente</option>
+        <option value="15">15 minutos</option>
+        <option value="30">30 minutos</option>
+        <option value="60">1 hora</option>
+        <option value="1440">1 día</option>
+      </select>
+    </div>
+    <div class="btns" style="justify-content:flex-end">
+      <button type="button" id="ban-cancel">Cancelar</button>
+      <button type="submit" class="danger">Banear</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialogo identificar PC (nombre del puesto + fila/grupo) -->
+<dialog id="pc-dialog">
+  <form id="pc-form">
+    <h2 style="margin-top:0">Identificar PC</h2>
+    <p id="pc-msg" class="hint" style="margin:0 0 12px;color:var(--text)"></p>
+    <div class="field"><label for="pc-name">Nombre del puesto</label><input id="pc-name" maxlength="32" autocomplete="off" placeholder="ej. PC-03"></div>
+    <div class="field"><label for="pc-group">Fila / grupo</label><input id="pc-group" maxlength="16" autocomplete="off" placeholder="ej. A"></div>
+    <p style="margin:0"><small class="hint">La <b>fila</b> agrupa PCs para mandar todo el grupo a un equipo con un botón. Dejá un campo vacío para borrarlo.</small></p>
+    <div class="btns" style="justify-content:flex-end;margin-top:14px">
+      <button type="button" id="pc-cancel">Cancelar</button>
+      <button type="submit" class="primary">Guardar</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Dialogo cerrar match del torneo (cargar marcador final por equipo) -->
+<dialog id="close-dialog">
+  <form id="close-form">
+    <h2 style="margin-top:0">Cerrar match</h2>
+    <p id="close-msg" class="hint" style="margin:0 0 6px;color:var(--text)"></p>
+    <p id="close-live" class="hint" style="margin:0 0 14px"></p>
+    <div class="row">
+      <div class="field"><label id="close-lbl-a" for="close-a">Puntaje A</label><input id="close-a" type="number" min="0" max="99" value="0"></div>
+      <button type="button" id="close-swap" style="flex:0 0 auto;align-self:flex-end;margin-bottom:10px" title="Intercambiar los dos puntajes">⇄</button>
+      <div class="field"><label id="close-lbl-b" for="close-b">Puntaje B</label><input id="close-b" type="number" min="0" max="99" value="0"></div>
+    </div>
+    <p style="margin:0"><small class="hint">Prerellenado con el score en vivo (CT→A si A arranca CT). Verificá contra el scoreboard del juego antes de confirmar — el lado se invierte en el halftime.</small></p>
+    <div class="btns" style="justify-content:flex-end;margin-top:14px">
+      <button type="button" id="close-cancel">Cancelar</button>
+      <button type="submit" class="primary">Guardar resultado</button>
     </div>
   </form>
 </dialog>
@@ -322,6 +511,63 @@
     });
   }
 
+  // ---------- ban dialog (promesa) ----------
+  // Resuelve con { type, value, minutes, userid } o null si se cancela. El value
+  // (IP o uniqueid) se toma del jugador segun el metodo elegido; deshabilita el
+  // metodo si el dato falta (ej. uniqueid o IP no disponible en el status).
+  function banDialog(p) {
+    return new Promise((resolve) => {
+      const dlg = $('#ban-dialog');
+      $('#ban-player').textContent = p.name + '  ·  IP: ' + (p.ip || '?') + '  ·  ID: ' + (p.uniqueid || '?');
+      const ipR = dlg.querySelector('input[value="ip"]');
+      const idR = dlg.querySelector('input[value="id"]');
+      ipR.disabled = !p.ip; idR.disabled = !p.uniqueid;
+      // default: IP si la hay (mas confiable en LAN), si no el uniqueid
+      if (p.ip) ipR.checked = true; else idR.checked = true;
+      $('#ban-minutes').value = '0';
+
+      const onSubmit = (e) => {
+        e.preventDefault();
+        const type = dlg.querySelector('input[name="ban-type"]:checked').value;
+        finish({ type, value: type === 'ip' ? p.ip : p.uniqueid, minutes: $('#ban-minutes').value, userid: p.userid });
+      };
+      const onCancel = () => finish(null);
+      function finish(result) {
+        $('#ban-form').removeEventListener('submit', onSubmit);
+        $('#ban-cancel').removeEventListener('click', onCancel);
+        dlg.close();
+        resolve(result);
+      }
+      $('#ban-form').addEventListener('submit', onSubmit);
+      $('#ban-cancel').addEventListener('click', onCancel);
+      dlg.showModal();
+    });
+  }
+
+  // ---------- dialogo identificar PC (promesa) ----------
+  // Resuelve con { label, group } (cada uno puede ser '' para borrar) o null si
+  // se cancela. La fila/grupo agrupa PCs para asignar el equipo de toda la fila.
+  function pcDialog(p) {
+    return new Promise((resolve) => {
+      const dlg = $('#pc-dialog');
+      $('#pc-msg').textContent = 'IP ' + p.ip;
+      const nameI = $('#pc-name'), grpI = $('#pc-group');
+      nameI.value = p.label || ''; grpI.value = p.group || '';
+      const onSubmit = (e) => { e.preventDefault(); finish({ label: nameI.value.trim(), group: grpI.value.trim() }); };
+      const onCancel = () => finish(null);
+      function finish(r) {
+        $('#pc-form').removeEventListener('submit', onSubmit);
+        $('#pc-cancel').removeEventListener('click', onCancel);
+        dlg.close();
+        resolve(r);
+      }
+      $('#pc-form').addEventListener('submit', onSubmit);
+      $('#pc-cancel').addEventListener('click', onCancel);
+      dlg.showModal();
+      setTimeout(() => nameI.focus(), 50);
+    });
+  }
+
   // ---------- consola ----------
   function logLine(text, cls) {
     const out = $('#console-out');
@@ -341,6 +587,7 @@
 
   // ---------- estado / status ----------
   let autoTimer = null;
+  let lastPlayers = [];   // ultima lista de jugadores (la usa la barra de filas)
   function setConn(state, text) {
     const dot = $('#conn-dot'); dot.className = 'dot' + (state ? ' ' + state : '');
     $('#conn-text').textContent = text;
@@ -358,6 +605,7 @@
     $('#status-summary').innerHTML = '<small class="hint">Mapa: <b style="color:var(--text)">' +
       (data.map || '?') + '</b> · Jugadores: <b style="color:var(--text)">' +
       (data.playerCount != null ? data.playerCount + '/' + data.maxPlayers : '?') + '</b></small>';
+    lastPlayers = data.players || [];
     const body = $('#players-body'); body.innerHTML = '';
     if (!data.players || !data.players.length) {
       $('#players-empty').classList.remove('hidden');
@@ -366,13 +614,49 @@
       for (const p of data.players) {
         const tr = document.createElement('tr');
         tr.innerHTML = '<td class="num">' + p.slot + '</td>' +
-          '<td></td>' +
-          '<td></td>' +
-          '<td></td>' +
+          '<td></td>' +   // 1: etiqueta de PC
+          '<td></td>' +   // 2: nombre
+          '<td></td>' +   // 3: equipo
+          '<td></td>' +   // 4: mover
           '<td class="num">' + p.frags + '</td>' +
           '<td class="num">' + p.ping + '</td>' +
           '<td style="text-align:right"></td>';
-        tr.children[1].textContent = p.name;           // nombre como texto (evita inyeccion)
+
+        // --- etiqueta de PC (identifica la maquina fisica por su IP LAN) ---
+        // En LAN no-steam el uniqueid no distingue PCs (todos comparten STEAM_ID_LAN),
+        // pero la IP si es unica por maquina. Acá el admin le pone un nombre a cada PC
+        // ("PC-03") y el backend lo recuerda por IP, asi se sabe quien es quien para
+        // armar los equipos. Sin IP detectada (ej. loopback), no se puede etiquetar.
+        const pcCell = tr.children[1];
+        const pcBtn = document.createElement('button');
+        pcBtn.type = 'button';
+        pcBtn.style.cssText = 'padding:3px 9px;font-size:12px;line-height:1.2;font-weight:700';
+        if (!p.ip) {
+          pcBtn.textContent = p.label || '—'; pcBtn.disabled = true; pcBtn.title = 'Sin IP detectada';
+        } else if (p.label) {
+          pcBtn.textContent = p.label + ' ✎'; pcBtn.title = 'Editar PC / fila (IP ' + p.ip + ')';
+          pcBtn.style.borderColor = 'var(--gold)'; pcBtn.style.color = 'var(--gold-soft)';
+        } else {
+          pcBtn.textContent = '+ etiquetar'; pcBtn.title = 'Identificar esta PC (IP ' + p.ip + ')';
+        }
+        if (p.ip) {
+          pcBtn.addEventListener('click', async () => {
+            const r = await pcDialog(p);
+            if (!r) return;                            // cancelado (campo vacio = borra)
+            const { ok, data } = await api('/api/label', { method: 'POST', body: JSON.stringify({ ip: p.ip, label: r.label, group: r.group }) });
+            if (!ok) { toast(data.error || 'Error al etiquetar', true); return; }
+            toast('Guardado'); refreshStatus();
+          });
+        }
+        pcCell.appendChild(pcBtn);
+        if (p.group) {
+          const chip = document.createElement('span');
+          chip.className = 'badge'; chip.style.marginLeft = '6px';
+          chip.textContent = 'Fila ' + p.group;
+          pcCell.appendChild(chip);
+        }
+
+        tr.children[2].textContent = p.name;           // nombre como texto (evita inyeccion)
 
         // --- equipo actual (badge) ---
         const TEAM_LABEL = { CT: 'CT', T: 'TT', SPEC: 'SPEC', UNK: '?' };
@@ -380,7 +664,7 @@
         const badge = document.createElement('span');
         badge.className = 'badge ' + team.toLowerCase();
         badge.textContent = TEAM_LABEL[team] || '?';
-        tr.children[2].appendChild(badge);
+        tr.children[3].appendChild(badge);
 
         // --- botones de mover (oculta el del equipo actual) ---
         const moveWrap = document.createElement('div');
@@ -401,39 +685,351 @@
           });
           moveWrap.appendChild(mb);
         }
-        tr.children[3].appendChild(moveWrap);
+        tr.children[4].appendChild(moveWrap);
 
-        // --- kick ---
-        const btn = document.createElement('button');
-        btn.type = 'button'; btn.className = 'danger'; btn.textContent = 'Kick';
-        btn.addEventListener('click', async () => {
+        // --- kick / ban ---
+        const actWrap = document.createElement('div');
+        actWrap.className = 'move-btns'; actWrap.style.justifyContent = 'flex-end';
+
+        const kickBtn = document.createElement('button');
+        kickBtn.type = 'button'; kickBtn.className = 'danger'; kickBtn.textContent = 'Kick';
+        kickBtn.addEventListener('click', async () => {
           if (await confirmAction('¿Kickear a "' + p.name + '" (userid ' + p.userid + ')?')) {
             await runCmd('kick #' + p.userid);
             toast('Kick enviado'); refreshStatus();
           }
         });
-        tr.children[6].appendChild(btn);
+        actWrap.appendChild(kickBtn);
+
+        const banBtn = document.createElement('button');
+        banBtn.type = 'button'; banBtn.className = 'danger'; banBtn.textContent = 'Ban';
+        banBtn.addEventListener('click', async () => {
+          const choice = await banDialog(p);
+          if (!choice) return;
+          if (!choice.value) { toast('Sin ' + (choice.type === 'ip' ? 'IP' : 'ID') + ' para este jugador', true); return; }
+          const { ok, data } = await api('/api/ban', { method: 'POST', body: JSON.stringify(choice) });
+          if (!ok) { toast(data.error || 'Error al banear', true); return; }
+          toast('Baneado: ' + p.name); refreshStatus(); refreshBans();
+        });
+        actWrap.appendChild(banBtn);
+
+        tr.children[7].appendChild(actWrap);
         body.appendChild(tr);
       }
     }
+    renderGroupBar(lastPlayers);
   }
-  function startAuto() { stopAuto(); if ($('#auto-refresh').checked) autoTimer = setInterval(refreshStatus, 5000); }
+  function startAuto() { stopAuto(); if ($('#auto-refresh').checked) autoTimer = setInterval(() => { refreshStatus(); refreshStats(); }, 5000); }
   function stopAuto() { if (autoTimer) clearInterval(autoTimer); autoTimer = null; }
+
+  // ---------- barra de filas (asignar equipo a todo un grupo) ----------
+  // Por cada fila/grupo presente entre los jugadores conectados, muestra botones
+  // CT / TT / SPEC que mueven a TODA la fila de un toque. Usa amx_md_setteam (igual
+  // que los botones por jugador), asi que depende del plugin del torneo en el server.
+  function renderGroupBar(players) {
+    const bar = $('#group-bar'); bar.innerHTML = '';
+    const groups = [...new Set(players.map((p) => p.group).filter(Boolean))].sort();
+    if (!groups.length) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+    const intro = document.createElement('span');
+    intro.className = 'subhead'; intro.style.cssText = 'margin:0 2px 0 0';
+    intro.textContent = 'Asignar fila:';
+    bar.appendChild(intro);
+    const TEAMS = [
+      { to: 'ct', label: 'CT', cls: 'to-ct' },
+      { to: 't', label: 'TT', cls: 'to-t' },
+      { to: 'spec', label: 'SPEC', cls: 'to-spec' },
+    ];
+    for (const g of groups) {
+      const n = players.filter((p) => p.group === g).length;
+      const wrap = document.createElement('div');
+      wrap.className = 'move-btns';
+      wrap.style.cssText = 'align-items:center;border:1px solid var(--border);border-radius:8px;padding:3px 8px';
+      const lab = document.createElement('span');
+      lab.style.cssText = 'font-size:12px;font-weight:700;color:var(--muted);margin-right:2px';
+      lab.textContent = 'Fila ' + g + ' (' + n + ')';
+      wrap.appendChild(lab);
+      for (const t of TEAMS) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = t.cls; b.textContent = t.label;
+        b.style.cssText = 'padding:3px 9px;font-size:12px;font-weight:800;line-height:1.2';
+        b.title = 'Mover toda la fila ' + g + ' a ' + t.label;
+        b.addEventListener('click', () => assignGroup(g, t.to, t.label));
+        wrap.appendChild(b);
+      }
+      bar.appendChild(wrap);
+    }
+  }
+  async function assignGroup(group, team, teamLabel) {
+    const players = lastPlayers.filter((p) => p.group === group);
+    if (!players.length) { toast('Fila ' + group + ' sin jugadores conectados', true); return; }
+    for (const p of players) {
+      await runCmd('amx_md_setteam ' + p.userid + ' ' + team, { echo: false });
+    }
+    toast('Fila ' + group + ' → ' + teamLabel + ' (' + players.length + ')');
+    refreshStatus();
+  }
+
+  // ---------- bans ----------
+  async function refreshBans() {
+    const { ok, data } = await api('/api/bans');
+    if (!ok) return;
+    renderBanRows($('#bans-ip-body'), $('#bans-ip-empty'), data.ips || [], 'ip');
+    renderBanRows($('#bans-id-body'), $('#bans-id-empty'), data.ids || [], 'id');
+  }
+  function renderBanRows(body, empty, list, type) {
+    body.innerHTML = '';
+    if (!list.length) { empty.classList.remove('hidden'); return; }
+    empty.classList.add('hidden');
+    for (const b of list) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td style="text-align:right"></td>';
+      tr.children[0].textContent = b.value;     // como texto (evita inyeccion)
+      tr.children[1].textContent = b.duration;
+      const btn = document.createElement('button');
+      btn.type = 'button'; btn.textContent = 'Quitar';
+      btn.addEventListener('click', async () => {
+        if (!(await confirmAction('¿Quitar el ban de "' + b.value + '"?'))) return;
+        const { ok, data } = await api('/api/unban', { method: 'POST', body: JSON.stringify({ type, value: b.value }) });
+        if (!ok) { toast(data.error || 'Error al desbanear', true); return; }
+        toast('Ban quitado'); refreshBans();
+      });
+      tr.children[2].appendChild(btn);
+      body.appendChild(tr);
+    }
+  }
+
+  // ---------- estadisticas ----------
+  let statsView = 'match';
+  let lastStats = null;
+  async function refreshStats() {
+    const { ok, data } = await api('/api/stats');
+    if (!ok) return;
+    lastStats = data;
+    renderStats();
+  }
+  function renderStats() {
+    if (!lastStats) return;
+    const v = statsView === 'tournament' ? lastStats.tournament : lastStats.match;
+    const body = $('#stats-body'); body.innerHTML = '';
+    // marcador de rondas.
+    // Si el plugin manda nombres + lado actual (MDS|TS), mostramos "Equipo (CT) score";
+    // el score sigue al equipo y el (CT)/(TT) + color se invierten en el swap de
+    // halftime. Sin esa linea (plugin viejo) o en la vista Acumulado, caemos al
+    // rotulo fijo CT — TT de siempre.
+    const esc = (s) => String(s == null ? '' : s).replace(/[<>&]/g, '');
+    const teamScore = (name, score, side) => {
+      const isCT = side !== 'T';
+      return '<span style="color:' + (isCT ? 'var(--blue-soft)' : 'var(--gold-soft)') + '">' +
+        esc(name) + ' <small style="opacity:.75;font-weight:600">(' + (isCT ? 'CT' : 'TT') + ')</small> ' + (score || 0) + '</span>';
+    };
+    if (statsView === 'match' && v.ctName) {
+      $('#stats-score').innerHTML =
+        teamScore(v.ctName, v.ct, v.ctSide) +
+        '<span style="color:var(--muted)">  —  </span>' +
+        teamScore(v.tName, v.t, v.tSide);
+    } else {
+      $('#stats-score').innerHTML =
+        '<span style="color:var(--blue-soft)">CT ' + (v.ct || 0) + '</span>' +
+        '<span style="color:var(--muted)">  —  </span>' +
+        '<span style="color:var(--gold-soft)">' + (v.t || 0) + ' TT</span>' +
+        (statsView === 'tournament' && v.matches ? '<span class="hint" style="font-size:12px;font-weight:400"> · ' + v.matches + ' match(es) cerrados</span>' : '');
+    }
+    const players = Object.values(v.players || {}).sort((a, b) => (b.kills - a.kills) || (a.deaths - b.deaths));
+    if (!players.length) { $('#stats-empty').classList.remove('hidden'); return; }
+    $('#stats-empty').classList.add('hidden');
+    const TEAM_LABEL = { CT: 'CT', T: 'TT', SPEC: 'SPEC', UNK: '?' };
+    for (const p of players) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td class="num">' + p.kills + '</td><td class="num">' + p.deaths +
+        '</td><td class="num">' + (p.deaths ? (p.kills / p.deaths).toFixed(2) : (p.kills ? '∞' : '0.00')) + '</td>';
+      tr.children[0].textContent = p.name || p.authid || '?';
+      const team = p.team || 'UNK';
+      const badge = document.createElement('span');
+      badge.className = 'badge ' + String(team).toLowerCase();
+      badge.textContent = TEAM_LABEL[team] || '?';
+      tr.children[1].appendChild(badge);
+      body.appendChild(tr);
+    }
+  }
+
+  // ---------- torneo (equipos + fixture + tabla) ----------
+  let lastTourney = null;
+  const PHASE_LABEL = { group: 'Grupos', semi: 'Semi', final: 'Final' };
+  const PHASE_FMT = { group: 'mr10', semi: 'mr12', final: 'mr12' };
+  const teamName = (id) => { const t = (lastTourney && lastTourney.teams.find((x) => x.id === id)); return t ? t.name : '?'; };
+
+  async function refreshTournament() {
+    const { ok, data } = await api('/api/tournament');
+    if (!ok) return;
+    lastTourney = data;
+    renderTeams(); renderTeamSelects(); renderMatches(); renderStandings();
+  }
+
+  function renderTeams() {
+    const body = $('#teams-body'); body.innerHTML = '';
+    const teams = (lastTourney && lastTourney.teams) || [];
+    $('#teams-empty').classList.toggle('hidden', teams.length > 0);
+    for (const t of teams) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td style="text-align:right"></td>';
+      tr.children[0].textContent = t.name;
+      tr.children[1].textContent = t.tag || '—';
+      const del = document.createElement('button');
+      del.type = 'button'; del.className = 'danger'; del.textContent = 'Borrar';
+      del.addEventListener('click', async () => {
+        if (!(await confirmAction('¿Borrar el equipo "' + t.name + '"?'))) return;
+        const { ok, data } = await api('/api/tournament/team/delete', { method: 'POST', body: JSON.stringify({ id: t.id }) });
+        if (!ok) { toast(data.error || 'Error', true); return; }
+        toast('Equipo borrado'); refreshTournament();
+      });
+      tr.children[2].appendChild(del);
+      body.appendChild(tr);
+    }
+  }
+
+  // Repuebla los dos selects de equipos del armador conservando la seleccion.
+  function renderTeamSelects() {
+    const teams = (lastTourney && lastTourney.teams) || [];
+    for (const sel of [$('#tm-a'), $('#tm-b')]) {
+      const prev = sel.value;
+      sel.innerHTML = '';
+      for (const t of teams) { const o = document.createElement('option'); o.value = t.id; o.textContent = t.name; sel.appendChild(o); }
+      if (teams.some((t) => t.id === prev)) sel.value = prev;
+    }
+    // por comodidad, B apunta al 2do equipo distinto de A si quedaron iguales
+    if ($('#tm-a').value && $('#tm-a').value === $('#tm-b').value && teams.length > 1) {
+      const other = teams.find((t) => t.id !== $('#tm-a').value);
+      if (other) $('#tm-b').value = other.id;
+    }
+  }
+
+  function renderMatches() {
+    const body = $('#matches-body'); body.innerHTML = '';
+    const matches = (lastTourney && lastTourney.matches) || [];
+    $('#matches-empty').classList.toggle('hidden', matches.length > 0);
+    const STATUS = { pending: ['Pendiente', 'var(--muted)'], live: ['En vivo', 'var(--ok)'], done: ['Cerrado', 'var(--gold-soft)'] };
+    for (const m of matches) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td></td><td></td><td class="num"></td><td></td><td style="text-align:right"></td>';
+      // fase
+      tr.children[0].innerHTML = '<span class="badge">' + (PHASE_LABEL[m.phase] || m.phase) + '</span> <small class="hint">' + m.format + '</small>';
+      // partido (A vs B), resaltando ganador
+      const aWin = m.winner === m.teamA, bWin = m.winner === m.teamB;
+      const nA = document.createElement('span'), nB = document.createElement('span');
+      nA.textContent = teamName(m.teamA); nB.textContent = teamName(m.teamB);
+      if (aWin) { nA.style.color = 'var(--gold-soft)'; nA.style.fontWeight = '800'; }
+      if (bWin) { nB.style.color = 'var(--gold-soft)'; nB.style.fontWeight = '800'; }
+      tr.children[1].appendChild(nA);
+      tr.children[1].appendChild(document.createTextNode(' vs '));
+      tr.children[1].appendChild(nB);
+      // marcador
+      tr.children[2].textContent = m.status === 'done' ? (m.scoreA + ' : ' + m.scoreB) : '—';
+      // estado
+      const st = STATUS[m.status] || [m.status, 'var(--muted)'];
+      tr.children[3].innerHTML = '<span style="color:' + st[1] + ';font-weight:700">' + st[0] + '</span>' +
+        (m.winner === 'draw' ? ' <small class="hint">empate</small>' : '');
+      // acciones
+      const acts = document.createElement('div'); acts.className = 'btns'; acts.style.justifyContent = 'flex-end';
+      const mkBtn = (label, cls, fn) => { const b = document.createElement('button'); b.type = 'button'; if (cls) b.className = cls; b.textContent = label; b.style.cssText = 'padding:3px 9px;font-size:12px'; b.addEventListener('click', fn); return b; };
+      if (m.status !== 'done') {
+        acts.appendChild(mkBtn('▶ Arrancar', '', async () => {
+          if (!(await confirmAction('¿Arrancar este match en el server ahora?'))) return;
+          const { ok, data } = await api('/api/tournament/match/start', { method: 'POST', body: JSON.stringify({ id: m.id }) });
+          if (!ok) { toast(data.error || 'Error', true); return; }
+          toast('Match arrancado'); refreshTournament(); refreshStatus();
+        }));
+        acts.appendChild(mkBtn('✓ Cerrar', 'primary', () => openCloseDialog(m)));
+      } else {
+        acts.appendChild(mkBtn('Reabrir', '', async () => {
+          const { ok, data } = await api('/api/tournament/match/reopen', { method: 'POST', body: JSON.stringify({ id: m.id }) });
+          if (!ok) { toast(data.error || 'Error', true); return; }
+          toast('Match reabierto'); refreshTournament();
+        }));
+      }
+      acts.appendChild(mkBtn('Borrar', 'danger', async () => {
+        if (!(await confirmAction('¿Borrar este match del fixture?'))) return;
+        const { ok, data } = await api('/api/tournament/match/delete', { method: 'POST', body: JSON.stringify({ id: m.id }) });
+        if (!ok) { toast(data.error || 'Error', true); return; }
+        toast('Match borrado'); refreshTournament();
+      }));
+      tr.children[4].appendChild(acts);
+      body.appendChild(tr);
+    }
+  }
+
+  function renderStandings() {
+    const body = $('#standings-body'); body.innerHTML = '';
+    const rows = (lastTourney && lastTourney.standings) || [];
+    $('#standings-empty').classList.toggle('hidden', rows.length > 0);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = '<td class="num">' + (i + 1) + '</td><td></td><td class="num">' + r.pj + '</td><td class="num">' + r.g +
+        '</td><td class="num">' + r.e + '</td><td class="num">' + r.p + '</td><td class="num">' + r.rf + ':' + r.ra +
+        '</td><td class="num">' + (r.dif > 0 ? '+' : '') + r.dif + '</td><td class="num" style="font-weight:800;color:var(--gold-soft)">' + r.pts + '</td>';
+      tr.children[1].textContent = r.name;
+      body.appendChild(tr);
+    });
+  }
+
+  // Dialogo de cierre: prerellena con el score en vivo (CT→A si A arranca CT).
+  async function openCloseDialog(m) {
+    const dlg = $('#close-dialog');
+    $('#close-msg').textContent = teamName(m.teamA) + '  vs  ' + teamName(m.teamB) + '  ·  ' + (PHASE_LABEL[m.phase] || m.phase) + ' ' + m.format;
+    $('#close-lbl-a').textContent = 'Puntaje ' + teamName(m.teamA);
+    $('#close-lbl-b').textContent = 'Puntaje ' + teamName(m.teamB);
+    // prerelleno: leer score en vivo y mapear CT/TT al equipo segun el lado inicial de A
+    let a = m.scoreA || 0, b = m.scoreB || 0, live = '';
+    const r = await api('/api/tournament/livescore');
+    if (r.ok && r.data && (r.data.ct || r.data.t)) {
+      const ct = r.data.ct, t = r.data.t;
+      a = m.sideA === 'ct' ? ct : t;
+      b = m.sideA === 'ct' ? t : ct;
+      live = 'En vivo ahora: CT ' + ct + ' — ' + t + ' TT';
+    } else {
+      live = 'Sin score en vivo (cargá el marcador a mano).';
+    }
+    $('#close-a').value = a; $('#close-b').value = b;
+    $('#close-live').textContent = live;
+
+    const onSwap = () => { const x = $('#close-a').value; $('#close-a').value = $('#close-b').value; $('#close-b').value = x; };
+    const onSubmit = async (e) => {
+      e.preventDefault();
+      const res = await api('/api/tournament/match/close', { method: 'POST', body: JSON.stringify({ id: m.id, scoreA: $('#close-a').value, scoreB: $('#close-b').value }) });
+      finish();
+      if (!res.ok) { toast(res.data.error || 'Error', true); return; }
+      toast('Resultado guardado'); refreshTournament();
+    };
+    const onCancel = () => finish();
+    function finish() {
+      $('#close-form').removeEventListener('submit', onSubmit);
+      $('#close-cancel').removeEventListener('click', onCancel);
+      $('#close-swap').removeEventListener('click', onSwap);
+      dlg.close();
+    }
+    $('#close-form').addEventListener('submit', onSubmit);
+    $('#close-cancel').addEventListener('click', onCancel);
+    $('#close-swap').addEventListener('click', onSwap);
+    dlg.showModal();
+  }
 
   // ---------- carga de mapas/configs ----------
   async function loadMeta() {
     const { ok, data } = await api('/api/meta');
     if (!ok) return;
-    const mapSel = $('#map-sel'), cfg = $('#cfg');
+    const mapSel = $('#map-sel'), cfg = $('#cfg'), tcfg = $('#tm-cfg');
     for (const m of (data.maps || [])) { const o = document.createElement('option'); o.value = o.textContent = m; mapSel.appendChild(o); }
-    for (const c of (data.configs || [])) { const o = document.createElement('option'); o.value = o.textContent = c; cfg.appendChild(o); }
+    for (const c of (data.configs || [])) {
+      cfg.appendChild(Object.assign(document.createElement('option'), { value: c, textContent: c }));
+      tcfg.appendChild(Object.assign(document.createElement('option'), { value: c, textContent: c }));
+    }
   }
 
   // ---------- login / vistas ----------
   function showApp() {
     $('#login-view').classList.add('hidden');
     $('#app-view').classList.remove('hidden');
-    loadMeta(); refreshStatus(); startAuto();
+    loadMeta(); refreshStatus(); refreshStats(); refreshBans(); refreshTournament(); startAuto();
   }
   function showLogin() {
     $('#app-view').classList.add('hidden');
@@ -453,8 +1049,52 @@
 
   $('#logout-btn').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); showLogin(); });
 
-  $('#refresh-btn').addEventListener('click', refreshStatus);
+  $('#refresh-btn').addEventListener('click', () => { refreshStatus(); refreshStats(); });
   $('#auto-refresh').addEventListener('change', startAuto);
+  $('#bans-refresh').addEventListener('click', refreshBans);
+  $('#tourney-refresh').addEventListener('click', refreshTournament);
+
+  // --- torneo: alta/edicion de equipo ---
+  $('#team-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = $('#team-name').value.trim();
+    if (!name) { toast('Falta el nombre', true); return; }
+    const tag = $('#team-tag').value.trim();
+    const { ok, data } = await api('/api/tournament/team', { method: 'POST', body: JSON.stringify({ name, tag }) });
+    if (!ok) { toast(data.error || 'Error', true); return; }
+    $('#team-name').value = ''; $('#team-tag').value = ''; $('#team-name').focus();
+    toast('Equipo agregado'); refreshTournament();
+  });
+
+  // --- torneo: la fase autocompleta el formato (grupos mr10, semis/final mr12) ---
+  $('#tm-phase').addEventListener('change', () => { $('#tm-fmt').value = PHASE_FMT[$('#tm-phase').value] || $('#tm-fmt').value; });
+
+  // --- torneo: crear match (start=true arranca en el server; false solo lo agenda) ---
+  async function createMatch(start) {
+    const teamA = $('#tm-a').value, teamB = $('#tm-b').value;
+    if (!teamA || !teamB) { toast('Definí los dos equipos primero', true); return; }
+    if (teamA === teamB) { toast('Elegí dos equipos distintos', true); return; }
+    const payload = {
+      teamA, teamB, sideA: $('#tm-side').value, phase: $('#tm-phase').value,
+      format: $('#tm-fmt').value.trim().toLowerCase(), config: $('#tm-cfg').value,
+      rec: $('#tm-rec').checked, start,
+    };
+    const { ok, data } = await api('/api/tournament/match', { method: 'POST', body: JSON.stringify(payload) });
+    if (!ok) { toast(data.error || 'Error', true); return; }
+    toast(start ? 'Match creado y arrancado' : 'Match creado'); refreshTournament(); if (start) refreshStatus();
+  }
+  $('#tmatch-form').addEventListener('submit', (e) => { e.preventDefault(); createMatch(true); });
+  $('#tm-create-only').addEventListener('click', () => createMatch(false));
+
+  document.querySelectorAll('input[name="stats-view"]').forEach((r) => {
+    r.addEventListener('change', () => { statsView = r.value; renderStats(); });
+  });
+  $('#stats-reset').addEventListener('click', async () => {
+    if (!(await confirmAction('¿Resetear el acumulado del torneo? El marcador del partido en curso no se toca.'))) return;
+    const { ok, data } = await api('/api/stats/reset', { method: 'POST' });
+    if (!ok) { toast(data.error || 'Error', true); return; }
+    toast('Acumulado reseteado'); refreshStats();
+  });
 
   // botones con data-rcon (y opcional data-confirm)
   document.querySelectorAll('[data-rcon]').forEach((btn) => {

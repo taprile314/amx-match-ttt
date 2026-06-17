@@ -3,15 +3,32 @@
 Cambios de este fork respecto del `amx_match_deluxe` 8.11 original.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [2.0.0] - 2026-06-17
+
+Segunda release mayor: el fork migró de HLDS stock a **ReHLDS + ReGameDLL + ReAPI**. Esto habilita el
+objetivo central que el engine stock no permitía — **una pausa real que congela también el reloj de la
+partida** (ronda, freezetime y C4), no solo a los jugadores. La rama `rehlds-port` pasó a ser `main`;
+la baseline sobre HLDS stock queda como [1.0.0].
 
 ### Added
+- **Pausa total sobre ReHLDS/ReAPI.** La pausa ahora congela el reloj de ronda además de a los
+  jugadores (imposible en el engine stock de [1.0.0]). Re-pinea por frame las entidades/tiempos del
+  engine vía ReAPI: el blow time de la C4, el fin del freezetime y `m_fRoundStartTimeReal` (de donde
+  el engine mide el BUYTIME). Ver _Fixed_ para los casos de borde resueltos (C4 plantada, freezetime,
+  ronda viva).
+- **`rg_set_user_team` (ReAPI) reemplaza el hack del offset.** El cambio de equipo crash-safe de
+  [1.0.0] (`md_set_team`, que escribía `m_iTeam` por el offset 114 de pdata) pasó a usar la native
+  `rg_set_user_team` de ReAPI — sin offsets hardcodeados atados a un build puntual del engine.
 - **Volcado de estadísticas para el panel rcon.** Nuevo comando admin `amx_md_stats` que escupe en
   líneas parseables el marcador de rondas real del match (`MDS|T|<ct>|<t>`, sumando 1ª + 2ª mitad +
   2-map + overtime) y, por jugador, `MDS|P|<userid>|<authid>|<kills>|<deaths>|<team>|<name>`
   (kills = frags del marcador, muertes = `cs_get_user_deaths`). El `rcon-panel` lo consulta para
   mostrar un contador de kills/muertes/rondas por partido **y** acumulado del torneo (persistido en
   `stats.json`, cerrando cada match automáticamente al reiniciarse el marcador).
+- **Línea de equipos con nombre + lado actual (`MDS|TS`)** en el volcado de stats, para que el panel
+  siga a cada equipo a través del swap de halftime: `MDS|TS|<clanCT>|<score>|<ladoActual>|<clanT>|<score>|<ladoActual>`.
+  Los clanes `main_clanCT`/`main_clanT` nunca se swapean; el lado físico actual se deriva de
+  `main_inprogress` (≥3 = 2ª mitad o knife de desempate → ya swapeado).
 - **Cartel "EL GANADOR ES &lt;equipo&gt;"** en la pantalla de fin de match. `md_all_to_spec()` arma el
   HUD con el nombre del equipo ganador, capturado en el bloque de resolución del marcador (global
   `g_winner_name`: `main_clanCT` / `main_clanT` según quién ganó, vacío = empate → muestra "EMPATE").
@@ -22,6 +39,18 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   de radio) pero, en vez del voto de lado del knife de inicio, llama a `md_knife_decider_finish()` que
   setea `g_winner_name` con el clan ganador y dispara el freeze a espectador con el cartel
   "EL GANADOR ES …". Si `amx_match_overtime` está en 0, el empate termina como empate (sin desempate).
+- **rcon-panel: gestión completa de torneo.** El panel sumó (datos persistidos por fuera del juego,
+  en `tournament.json` / `pc-labels.json` / `stats.json`, todos fuera del git):
+  - **Equipos + fixture + tabla de posiciones.** Alta de equipos (nombre + tag), armado de match
+    (A vs B, lado, fase, formato, config) con **▶ Crear y arrancar** que lanza `amx_match` por rcon
+    y empuja `amx_match_overtime` según fase (0 grupos / 1 semis-final). Fixture con estados
+    (pendiente/en vivo/cerrado), cierre **semi-manual** (prerellena el marcador con el score en vivo,
+    el admin confirma/intercambia) y tabla de grupos auto-computada (PJ, G/E/P, RF:RA, dif, pts).
+  - **Etiquetas de PC por IP** (la IP LAN es el único id físico confiable en no-steam): columna PC,
+    etiquetar puesto/fila, y **asignar una fila entera** a CT/TT/SPEC de un click.
+  - **Gestión de bans** por IP (`addip`) o ID (`banid`) con duración, lista de bans activos y
+    `writeip`/`writeid` para que sobrevivan al reinicio.
+  - **Card de estadísticas** (rondas + K/D por jugador) con vista Partido / Acumulado del torneo.
 
 ### Fixed
 - **El freeze a espectador fallaba con presets de liga restrictivos.** Las configs `cal`/`calot`
@@ -42,8 +71,21 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   LIVE por debajo. Ahora `match_pause` detecta `m_bFreezePeriod`, guarda los segundos restantes
   (`g_pause_freeze_left`) y `md_pause_frame` re-pinea `m_fRoundStartTimeReal` cada frame, así el freeze
   se congela y se reanuda con el tiempo que tenía.
+- **Pausa con la ronda viva: la ventana de compra ya no se vence durante la pausa.** El BUYTIME lo
+  mide el engine desde `m_fRoundStartTimeReal`; con la ronda viva ese valor queda en el pasado y, sin
+  re-pinearlo, `gametime - m_fRoundStartTimeReal` seguía creciendo durante la pausa → la compra se
+  vencía. Ahora `match_pause` guarda los segundos transcurridos (`g_pause_real_elapsed`) y
+  `md_pause_frame` clava `m_fRoundStartTimeReal` cada frame para mantener ese delta constante (fuera
+  del freeze; en freeze sigue aplicando el caso anterior).
 
 ### Changed
+- **Defaults de `amxmd.cfg` para el formato del torneo.** `amx_match_endtype` pasó a `1` (clinch
+  estándar: corta al ganar la ronda MR+1, p.ej. MR10 → corta en 11) y `amx_match_overtime` a `0`
+  (default seguro de fase de grupos: el empate se define por puntaje, sin knife). El panel empuja
+  `amx_match_overtime 1` por rcon en semis/final para habilitar el desempate por knife.
+- **MOTD: reglas del torneo concretas.** El `index.html` del motd-server reemplazó los placeholders
+  `[EDITAR: …]` por las reglas reales (fase de grupos a 11 / semis y final a 13, empate por puntaje
+  vs. knife, política de pausas: 3 × 30 s por equipo y partida, solo entre rondas).
 - **Ayuda de comandos de consola traducida al español.** Los textos del 4º argumento de
   `register_concmd`/`register_clcmd` (los que muestra `amx_help` o un comando con argumentos mal)
   pasaron de inglés a español (`Restart a match` → `Reiniciar un match`, `<Config filename>` →
@@ -55,11 +97,6 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/).
   (usan mecanismos distintos: la pausa pinea la entidad real de la C4 por frame, c4timer solo manda
   mensajes de display). El roce cosmético del HUD al pausar con la bomba plantada quedó resuelto con
   `md_send_frozen_time()` (ver _Fixed_ arriba).
-
-### Planned
-- Migración a **ReHLDS + ReGameDLL + ReAPI** (rama `rehlds-port`). Objetivo principal: **pausa real
-  que congela también el tiempo de la partida**, no solo a los jugadores — imposible en el engine
-  stock. De paso, reemplazar el hack del offset 114 de `md_set_team` por la native `rg_set_user_team`.
 
 ## [1.0.0] - 2026-06-12
 

@@ -618,6 +618,7 @@ new g_pause_c4 = 0				// TTT (port): entidad de la C4 plantada al pausar (0 = no
 new Float:g_pause_c4_left = 0.0	// TTT (port): segundos para detonar la C4, congelados al pausar
 new g_pause_in_freeze = 0		// TTT (port): 1 -> se pauso durante el freezetime (compra de inicio de ronda)
 new Float:g_pause_freeze_left = 0.0	// TTT (port): segundos que le quedaban al freezetime, congelados al pausar
+new Float:g_pause_real_elapsed = 0.0	// TTT (port): segundos desde el inicio REAL de la ronda (m_fRoundStartTimeReal) al pausar; clava el BUYTIME (que el engine mide desde ahi) en una pausa con la ronda viva
 
 
 // HLTV Stuff
@@ -6166,6 +6167,18 @@ public md_stats_console(id, level)
 	new t_score  = main_score_t[0]  + main_score_t[1]  + main_score_2mm_t  + main_score_overtime
 	console_print(id, "MDS|T|%d|%d", ct_score, t_score)
 
+	// TTT: linea de equipos con NOMBRE + lado ACTUAL, para que el panel siga al
+	// equipo a traves del swap de halftime (los numeros de MDS|T ya son totales por
+	// equipo: main_clanCT/main_clanT son los que ARRANCARON CT/T y nunca se swapean;
+	// ct_score/t_score los siguen via el cruce de indices en score_new). El lado
+	// fisico actual: 1a mitad (inprogress 0/1/2) el de CT esta en CT; 2a mitad o
+	// knife de desempate (3/4/5) ya esta en T (y el de T en CT).
+	//   MDS|TS|<clanQueArrancoCT>|<score>|<ladoActual>|<clanQueArrancoT>|<score>|<ladoActual>
+	new swapped_now = (main_inprogress >= 3) ? 1 : 0
+	console_print(id, "MDS|TS|%s|%d|%s|%s|%d|%s",
+		main_clanCT, ct_score, swapped_now ? "T" : "CT",
+		main_clanT,  t_score,  swapped_now ? "CT" : "T")
+
 	new players[32], num
 	get_players(players, num)
 
@@ -6822,6 +6835,16 @@ public match_pause(id, level)
 		g_pause_in_freeze = 1
 	}
 
+	// TTT (port): el BUYTIME lo mide el engine desde el inicio REAL de la ronda
+	// (m_fRoundStartTimeReal). Con la ronda viva ese valor queda en el pasado y, sin
+	// re-pinearlo, "gametime - m_fRoundStartTimeReal" sigue creciendo durante la pausa
+	// -> la ventana de compra se vence. Guardamos los segundos transcurridos para que
+	// md_pause_frame lo clave (solo aplica fuera del freeze; en freeze se usa el bloque
+	// de arriba que mantiene el fin del freeze en el futuro).
+	g_pause_real_elapsed = get_gametime() - Float:get_member_game(m_fRoundStartTimeReal)
+	if(g_pause_real_elapsed < 0.0)
+		g_pause_real_elapsed = 0.0
+
 	// Congelar + godmode a todos los vivos
 	new players[32], num, pl
 	get_players(players, num, "a")
@@ -6983,10 +7006,14 @@ public md_pause_frame()
 	if(g_pause_c4 > 0 && pev_valid(g_pause_c4))
 		set_member(g_pause_c4, m_Grenade_flC4Blow, get_gametime() + g_pause_c4_left)
 
-	// TTT (port): si se pauso durante el freezetime, re-pinear el fin del freeze para
-	// que el periodo de compra NO se venza durante la pausa (gametime siempre < fin).
+	// TTT (port): re-pinear m_fRoundStartTimeReal (de donde el engine mide el BUYTIME).
+	//   - en freeze: mantener el fin del freeze en el futuro (no se vence el freeze ni la compra).
+	//   - ronda viva: mantener "gametime - m_fRoundStartTimeReal" constante para que la
+	//     ventana de compra NO siga corriendo durante la pausa.
 	if(g_pause_in_freeze)
 		set_member_game(m_fRoundStartTimeReal, get_gametime() + g_pause_freeze_left)
+	else
+		set_member_game(m_fRoundStartTimeReal, get_gametime() - g_pause_real_elapsed)
 
 	return FMRES_IGNORED
 }

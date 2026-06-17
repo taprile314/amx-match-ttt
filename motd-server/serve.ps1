@@ -54,7 +54,19 @@ function Send-Response {
 }
 
 $listener = New-Object System.Net.Sockets.TcpListener([System.Net.IPAddress]::Any, $Port)
-$listener.Start()
+try {
+  $listener.Start()
+} catch [System.Net.Sockets.SocketException] {
+  Write-Host ""
+  Write-Host "  ===========================================================" -ForegroundColor Red
+  Write-Host ("   No pude abrir el puerto {0}: ya esta en uso." -f $Port)   -ForegroundColor Yellow
+  Write-Host "   Probablemente ya hay un servidor MOTD corriendo (no abras"  -ForegroundColor Gray
+  Write-Host "   el .bat dos veces). Si esa ventana sigue abierta, usala."   -ForegroundColor Gray
+  Write-Host ("   Para ver quien lo ocupa:  netstat -ano ^| findstr :{0}" -f $Port) -ForegroundColor DarkGray
+  Write-Host "  ===========================================================" -ForegroundColor Red
+  Write-Host ""
+  exit 1
+}
 
 Write-Host ""
 Write-Host "  ===========================================================" -ForegroundColor DarkYellow
